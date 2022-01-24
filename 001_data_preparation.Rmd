@@ -10,9 +10,9 @@ library(tidyverse)
 ### 1 Combined human data and create gene table
 ```{r create human gene table}
 # load data
-gm18558 <- read_table("results/GM18558_Zeb2_neg.featureCounts.jcounts")
-gm18960 <- read_table("results/GM18960_Zeb2_neg.featureCounts.jcounts")
-gm19240 <- read_table("results/GM19240_Zeb2_neg.featureCounts.jcounts")
+gm18558 <- read_table("genecount/GM18558_Zeb2_neg.featureCounts.jcounts")
+gm18960 <- read_table("genecount/GM18960_Zeb2_neg.featureCounts.jcounts")
+gm19240 <- read_table("genecount/GM19240_Zeb2_neg.featureCounts.jcounts")
 
 # remove gene name is NA, and select gene count
 gm18558 <- drop_na(gm18558[,c(1,9)])
@@ -28,7 +28,11 @@ hm.gene <- inner_join(gm18558, gm18960, by="Group.1")
 hm.gene <- inner_join(hm.gene, gm19240, by = "Group.1")
 colnames(hm.gene) <- c("gene", "GM18558", "GM18960", "GM19240")
 hm.gene <- hm.gene %>%
-  mutate(GM18558 = round(GM18558), GM18960 = round(GM18960), GM19240 = round(GM19240))
+  mutate(
+    GM18558 = round(GM18558), 
+    GM18960 = round(GM18960), 
+    GM19240 = round(GM19240)
+  )
 
 write.table(hm.gene, "counts/hm_gene.csv", sep=",")
 ```
@@ -36,9 +40,9 @@ write.table(hm.gene, "counts/hm_gene.csv", sep=",")
 ### 2 combined chimpanzee data and create gene table
 ```{r create chimpanzee table}
 # load data
-judith <- read_table("results/Chimp_Judith_Zeb2_neg.featureCounts.jcounts")
-leo <- read_table("results/Chimp_Leo_Zeb2_neg.featureCounts.jcounts")
-maryke <- read_table("results/Chimp_Maryke_Zeb2_neg.featureCounts.jcounts")
+judith <- read_table("genecount/Chimp_Judith_Zeb2_neg.featureCounts.jcounts")
+leo <- read_table("genecount/Chimp_Leo_Zeb2_neg.featureCounts.jcounts")
+maryke <- read_table("genecount/Chimp_Maryke_Zeb2_neg.featureCounts.jcounts")
 
 # remove NA and select gene count
 judith <- drop_na(judith[,c(1,9)])
@@ -63,9 +67,9 @@ write.table(chimp.gene, "counts/chimp_gene.csv", sep=",")
 
 ### 3 combined orangutans data and create gene table
 ```{r}
-guchi <- read_table("results/Orang_Guchi_Zeb2_neg.featureCounts.jcounts")
-jaqo <- read_table("results/Orang_Jaqo_Zeb2_neg.featureCounts.jcounts")
-jingjing <- read_table("results/Orang_JingJing_Zeb2_neg.featureCounts.jcounts")
+guchi <- read_table("genecount/Orang_Guchi_Zeb2_neg.featureCounts.jcounts")
+jaqo <- read_table("genecount/Orang_Jaqo_Zeb2_neg.featureCounts.jcounts")
+jingjing <- read_table("genecount/Orang_JingJing_Zeb2_neg.featureCounts.jcounts")
 
 # remove NA and select gene count
 guchi <- drop_na(guchi[,c(1,9)])

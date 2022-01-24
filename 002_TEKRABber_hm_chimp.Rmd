@@ -1,0 +1,104 @@
+---
+title: "002_TEKRABber_hm_chimp"
+output: html_document
+---
+
+```{r}
+library(TEKRABber)
+library(tidyverse)
+```
+
+### 1 download ortholog information
+```{r}
+# load data
+hmGene <- read.csv("counts/hm_gene.csv")
+hmTE <- read.csv("counts/hm_te.csv")
+hmTE <- hmTE[,c(1,4,5,6)]
+chimpGene <- read.csv("counts/chimp_gene.csv")
+chimpTE <- read.csv("counts/chimp_te.csv")
+chimpTE <- chimpTE[,c(1,4,5,6)]
+
+fetchData <- orthologScale(
+  geneCountRef = hmGene,
+  geneCountCompare = chimpGene,
+  speciesRef = 'hsapiens',
+  speciesCompare = 'ptroglodytes'
+)
+```
+
+### 2 create input dataframes for DE expressed analysis and correlation estimation
+```{r}
+inputBundle <- DECorrInputs(
+  orthologTable = fetchData$orthologTable,
+  scaleFactor = fetchData$scaleFactor,
+  geneCountRef = hmGene,
+  geneCountCompare = chimpGene,
+  teCountRef = hmTE,
+  teCountCompare = chimpTE
+)
+```
+### 3 DE analysis
+```{r}
+meta <- data.frame(
+  species = c(rep("human", ncol(hmGene)-1), 
+              rep("chimpanzee", ncol(chimpGene)-1))
+)
+
+meta$species <- factor(meta$species, levels = c("human", "chimpanzee"))
+rownames(meta) <- colnames(inputBundle$geneInputDESeq2)
+hmchimpDE <- DEgeneTE(
+  geneTable = inputBundle$geneInputDESeq2,
+  teTable = inputBundle$teInputDESeq2,
+  metadata = meta,
+  contrastVector = c("species", "human", "chimpanzee"),
+  expDesign = TRUE
+)
+
+```
+### Correlation analysis
+We need to filter KRAB-ZNFs from gene list
+```{r}
+# load kznfs 
+hm337 <- read.csv("counts/human337KZNFs.csv")
+ensembl_id <- c(hm337$ensembl_gene_id, "ENSG00000130726") # ENSG00000130726 = KAP1, TRIM28
+
+# load ortholog data
+hmGeneCorrInput <- inputBundle$geneCorrInputRef
+hmGeneCorrInput <- hmGeneCorrInput[rownames(hmGeneCorrInput) %in% ensembl_id,]
+chimpGeneCorrInput <- inputBundle$geneCorrInputCompare
+chimpGeneCorrInput <- chimpGeneCorrInput[rownames(chimpGeneCorrInput) %in% ensembl_id,]
+
+# filter gene name and add KAP1
+gene.name <- hm337[hm337$ensembl_gene_id %in% rownames(hmGeneCorrInput),]
+gene.name <- rbind(gene.name, c("ENSG00000130726", "TRIM28"))
+
+# replace rownames from ensembl_id to gene name
+rownames(hmGeneCorrInput) <- gene.name$external_gene_name[match(rownames(hmGeneCorrInput), gene.name$ensembl_gene_id)]
+
+rownames(chimpGeneCorrInput) <- gene.name$external_gene_name[
+  match(rownames(chimpGeneCorrInput), gene.name$ensembl_gene_id)
+]
+
+# load TE data
+hmTECorrInput <- inputBundle$TECorrInputRef
+chimpTECorrInput <- inputBundle$TECorrInputCompare
+
+# run correlation
+hmCorrResult <- corrOrthologTE(
+    geneInput = hmGeneCorrInput,
+    teInput = hmTECorrInput,
+    corrMethod = "pearson",
+    padjMethod = "fdr",
+    filename = "hmCorrResult.csv"
+)
+chimpCorrResult <- corrOrthologTE(
+  geneInput = chimpGeneCorrInput,
+  teInput = chimpTECorrInput,
+  corrMethod = "pearson",
+  padjMethod = "fdr",
+  filename = "chimpCorrResult.csv"
+)
+
+
+```
+
