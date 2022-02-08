@@ -1,0 +1,61 @@
+---
+title: "intersection analysis"
+output: html_document
+---
+
+### Data Information
+The input tables are corrdinates information of KRAB-ZNFs and TEs based on 
+different method. Two of them are matrices built using **JASPAR Core 
+nonredundant vertebrates-2020 collection**, **Zinc finger motifs for human in 
+the JASPAR Collection Unvalidated** and **collection of motifs assembled by 
+Dogan et al**. Upon these four data are intersect by RNA-seq data result which 
+include significantly correlated KRAB-ZNFs and TEs from TEKRABber's result.
+
+```{r load data}
+load("intersect/db_tight.rda") # database x TEKRABber tight
+load("intersect/db_ext.rda") # database x TEKRABber -/+ 100bp
+load("intersect/katja_tight.rda") # ChIP-seq x TEKRABber tight
+load("intersect/katja_ext.rda") # ChIP-seq x TEKRABber -/+ 100bp
+
+hm_db <- db_tight$hm
+chimp_db <- db_tight$chimp
+oran_db <- db_tight$oran
+hm_db_ext <- db_ext$hm
+chimp_db_ext <- db_ext$chimp
+oran_db_ext <- db_ext$oran
+
+hm_kat <- katja_tight$hm
+chimp_kat <- katja_tight$chimp
+oran_kat <- katja_tight$oran
+hm_kat_ext <- katja_ext$hm
+chimp_kat_ext <- katja_ext$chimp
+oran_kat_ext <- katja_ext$oran
+
+
+```
+
+Q1: How many ZNFs and TEs found in the intersect data?
+```{r}
+printCount <- function(df){
+    znfcount <- length(unique(df$ZNF_ms))
+    tecount <- length(unique(df$te_name))
+    paste0("unique znf/te count: ", znfcount, " & ", tecount)
+}
+
+dbList <- list(
+    hm_db, hm_db_ext,
+    chimp_db, chimp_db_ext,
+    oran_db, oran_db_ext
+)
+
+print(lapply(dbList, printCount))
+
+katjaList <- list(
+    hm_kat, hm_kat_ext,
+    chimp_kat, chimp_kat_ext,
+    oran_kat, oran_kat_ext
+) 
+
+print(lapply(katjaList, printCount))
+```
+
