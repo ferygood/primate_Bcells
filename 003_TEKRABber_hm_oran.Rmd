@@ -73,12 +73,12 @@ oranGeneCorrInput <- oranGeneCorrInput[rownames(oranGeneCorrInput) %in% ensembl_
 gene.name <- hm337[hm337$ensembl_gene_id %in% rownames(hmGeneCorrInput),]
 gene.name <- rbind(gene.name, c("ENSG00000130726", "TRIM28"))
 
-# replace rownames from ensembl_id to gene name
-# rownames(hmGeneCorrInput) <- gene.name$external_gene_name[match(rownames(hmGeneCorrInput), gene.name$ensembl_gene_id)]
-# 
-# rownames(oranGeneCorrInput) <- gene.name$external_gene_name[
-#   match(rownames(oranGeneCorrInput), gene.name$ensembl_gene_id)
-# ]
+#replace rownames from ensembl_id to gene name
+rownames(hmGeneCorrInput) <- gene.name$external_gene_name[match(rownames(hmGeneCorrInput), gene.name$ensembl_gene_id)]
+
+rownames(oranGeneCorrInput) <- gene.name$external_gene_name[
+  match(rownames(oranGeneCorrInput), gene.name$ensembl_gene_id)
+]
 
 # load TE data
 hmTECorrInput <- inputBundle$TECorrInputRef
@@ -90,20 +90,22 @@ hmCorrResult <- corrOrthologTE(
     teInput = hmTECorrInput,
     corrMethod = "pearson",
     padjMethod = "fdr",
-    filename = "hmCorrResult.csv"
+    fileDir = "hmoran_results",
+    fileName = "hmCorrResult.csv"
 )
 oranCorrResult <- corrOrthologTE(
   geneInput = oranGeneCorrInput,
   teInput = oranTECorrInput,
   corrMethod = "pearson",
   padjMethod = "fdr",
-  filename = "chimpCorrResult.csv"
+  fileDir = "hmoran_results",
+  fileName = "oranCorrResult.csv"
 )
 
 
 ```
 
-```{r}
+```{r, eval=FALSE}
 appTEKRABber(
   DEresult = hmoranDE,
   corrRef = hmCorrResult,

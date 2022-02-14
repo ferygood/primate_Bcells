@@ -59,3 +59,54 @@ katjaList <- list(
 print(lapply(katjaList, printCount))
 ```
 
+A1: from the results aboved, we can know the KZNFs and TEs found from exact and 
+extend location are the same. 
+
+
+Q2: we want to count the repeat ZNFs motifs & TE pairs in our data. Then we can
+see the visualization of the heatmaps/bipartite plots.
+```{r}
+library(data.table)
+
+# count how many same znf motifs and te names
+countRepeat <- function(df, name) {
+    df_count <- setDT(df[, c(1,2,3)])[, list(Count=.N), names(df[, c(1,2,3)])]
+    path <- file.path("intersect", name)
+    write.table(df_count, path, sep=",")
+    df_count
+}
+
+countRepeat(hm_db, "hm_db_repeat.csv")
+countRepeat(chimp_db, "chimp_db_repeat.csv")
+countRepeat(oran_db, "oran_db_repeat.csv")
+countRepeat(hm_kat, "hm_kat_repeat.csv")
+countRepeat(chimp_kat, "chimp_kat_repeat.csv")
+countRepeat(oran_kat, "oran_kat_repeat.csv")
+
+```
+
+
+
+```{r}
+library(reshape2)
+test <- countRepeat(hm_db, "hm_db_repeat.csv")
+test <- test[test$chromosome=="chr19",]
+test <- test[,c(1,3,4)]
+test2 <- dcast(test, te_name~ZNF_ms)
+rownames(test2) <- test2$te_name
+test2 <- test2[-1]
+test2[is.na(test2)] <- 0
+heatmap(as.matrix(test2))
+```
+
+```{r}
+library(reshape2)
+test <- countRepeat(chimp_db, "chimp_db_repeat.csv")
+test <- test[test$chromosome=="chr19",]
+test <- test[,c(1,3,4)]
+test2 <- dcast(test, te_name~ZNF_ms)
+rownames(test2) <- test2$te_name
+test2 <- test2[-1]
+test2[is.na(test2)] <- 0
+heatmap(as.matrix(test2))
+```
