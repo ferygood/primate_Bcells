@@ -28,6 +28,40 @@ oranCorrSig <- select_neg(oranCorr)
 hmCorr <- hmchimpCorrSig[hmchimpCorrSig$geneName %in% hmoranCorrSig$geneName,]
 ```
 
+```{r drawing heatmap}
+library(ggplot2)
+library(heatmaply)
+library(reshape2)
+
+pair_heatmap <- function(df, top=40, chr=NULL, lowCol="#d2e1b1", highCol="#bf8924"){
+
+    if(!is.null(chr)){
+        # filter chromosome
+        df <- df[df$chromosome==chr, ]
+    }
+    
+    # select top genes
+    df <- df[order(df$Count, decreasing=TRUE), ][seq_len(top), ]
+    df <- df[, c("ZNF_ms", "te_name", "Count")]
+    dft <- dcast(df, te_name~ZNF_ms, value.var="Count", sum)
+    rownames(dft) <- dft$te_name
+    dft <- dft[-1]
+    dft[is.na(dft)] <- 0
+    
+    #figPath <- file.path(figDir, figName)
+    
+    
+    heatmaply(as.matrix(dft), 
+              colors = c(low=lowCol, high=highCol),
+              xlab="KRAB-ZNFs",
+              ylab="TEs"
+    )
+    
+
+}
+```
+
+
 
 Intro {data-navmenu="Home"}
 =================================================
@@ -132,4 +166,42 @@ include significantly correlated KRAB-ZNFs and TEs from TEKRABber's result.
 # here we try to select the KRAB-ZNFs result
 ```
 
+Human {data-navmenu="Overlapped"}
+=================================================
 
+Column
+-------------------------------------------------
+### Clustering pair counts in Human (JASPAR & other database) {data-padding=50}  
+We visualize the pair counts comparing motifs from KRAB-ZNFs and TEs from JASPAR 
+and TEKRABber results. Here we only show the top 40 counts.  
+```{r}
+hmdbTable <- read.csv("intersect/hm_db_repeat.csv")
+
+pair_heatmap(hmdbTable)
+```
+
+### Clustering pair counts in Human (ChIP-Seq) {data-padding=50}  
+```{r}
+hmkatTable <- read.csv("intersect/hm_kat_repeat.csv")
+pair_heatmap(hmkatTable, chr = "chr12")
+```
+
+Chimpanzee {data-navmenu="Overlapped"}
+=================================================
+
+Column
+-------------------------------------------------
+### Clustering pair counts in Chimpanzee (JASPAR & other database) {data-padding=50}  
+We visualize the pair counts comparing motifs from KRAB-ZNFs and TEs from JASPAR 
+and TEKRABber results. Here we only show the top 40 counts.  
+```{r}
+chimpdbTable <- read.csv("intersect/chimp_db_repeat.csv")
+
+pair_heatmap(chimpdbTable)
+```
+
+### Clustering pair counts in Chimpanzee (ChIP-Seq) {data-padding=50}  
+```{r}
+chimpkatTable <- read.csv("intersect/chimp_kat_repeat.csv")
+pair_heatmap(chimpkatTable, chr = "chr12")
+```
