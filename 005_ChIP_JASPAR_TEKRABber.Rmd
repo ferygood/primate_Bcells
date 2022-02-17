@@ -17,19 +17,19 @@ load("intersect/db_ext.rda") # database x TEKRABber -/+ 100bp
 load("intersect/katja_tight.rda") # ChIP-seq x TEKRABber tight
 load("intersect/katja_ext.rda") # ChIP-seq x TEKRABber -/+ 100bp
 
-hm_db <- db_tight$hm
-chimp_db <- db_tight$chimp
-oran_db <- db_tight$oran
-hm_db_ext <- db_ext$hm
-chimp_db_ext <- db_ext$chimp
-oran_db_ext <- db_ext$oran
+hm_db <- df_db_tight_split$hm
+chimp_db <- df_db_tight_split$chimp
+oran_db <- df_db_tight_split$oran
+hm_db_ext <- df_db_ext_split$hm
+chimp_db_ext <- df_db_ext_split$chimp
+oran_db_ext <- df_db_ext_split$oran
 
-hm_kat <- katja_tight$hm
-chimp_kat <- katja_tight$chimp
-oran_kat <- katja_tight$oran
-hm_kat_ext <- katja_ext$hm
-chimp_kat_ext <- katja_ext$chimp
-oran_kat_ext <- katja_ext$oran
+hm_kat <- kat_tight_split$hm
+chimp_kat <- kat_tight_split$chimp
+oran_kat <- kat_tight_split$oran
+hm_kat_ext <- kat_ext_split$hm
+chimp_kat_ext <- kat_ext_split$chimp
+oran_kat_ext <- kat_ext_split$oran
 
 
 ```

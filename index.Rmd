@@ -183,7 +183,27 @@ pair_heatmap(hmdbTable)
 ### Clustering pair counts in Human (ChIP-Seq) {data-padding=50}  
 ```{r}
 hmkatTable <- read.csv("intersect/hm_kat_repeat.csv")
-pair_heatmap(hmkatTable, chr = "chr12")
+pair_heatmap(hmkatTable)
+```
+
+Human (Ch19) {data-navmenu="Overlapped"}
+=================================================
+
+Column
+-------------------------------------------------
+### Clustering pair counts in Human (JASPAR & other database) {data-padding=50}  
+We visualize the pair counts comparing motifs from KRAB-ZNFs and TEs from JASPAR 
+and TEKRABber results. Here we only show the top 40 counts.  
+```{r}
+hmdbTable <- read.csv("intersect/hm_db_repeat.csv")
+
+pair_heatmap(hmdbTable, chr="chr19")
+```
+
+### Clustering pair counts in Human (ChIP-Seq) {data-padding=50}  
+```{r}
+hmkatTable <- read.csv("intersect/hm_kat_repeat.csv")
+pair_heatmap(hmkatTable, chr="chr19")
 ```
 
 Chimpanzee {data-navmenu="Overlapped"}
@@ -203,5 +223,81 @@ pair_heatmap(chimpdbTable)
 ### Clustering pair counts in Chimpanzee (ChIP-Seq) {data-padding=50}  
 ```{r}
 chimpkatTable <- read.csv("intersect/chimp_kat_repeat.csv")
-pair_heatmap(chimpkatTable, chr = "chr12")
+pair_heatmap(chimpkatTable)
 ```
+
+
+Orangutans {data-navmenu="Overlapped"}
+=================================================
+
+Column
+-------------------------------------------------
+### Clustering pair counts in Orangutans (JASPAR & other database) {data-padding=50}  
+We visualize the pair counts comparing motifs from KRAB-ZNFs and TEs from JASPAR 
+and TEKRABber results. Here we only show the top 40 counts.  
+```{r}
+orandbTable <- read.csv("intersect/oran_db_repeat.csv")
+
+pair_heatmap(orandbTable)
+```
+
+### Clustering pair counts in Orangutans (ChIP-Seq) {data-padding=50}  
+```{r}
+orankatTable <- read.csv("intersect/oran_kat_repeat.csv")
+pair_heatmap(orankatTable)
+```
+
+Intro {data-navmenu="Bipartite"}
+=================================================
+### Intro
+In this section, we use **bipartite** graph to visualize selected ZNF_ms and 
+TEs.
+
+The input tables are corrdinates information of KRAB-ZNFs and TEs based on 
+different method. Two of them are matrices built using **JASPAR Core 
+nonredundant vertebrates-2020 collection**, **Zinc finger motifs for human in 
+the JASPAR Collection Unvalidated** and **collection of motifs assembled by 
+Dogan et al**. Upon these four data are intersect by RNA-seq data result which 
+include significantly correlated KRAB-ZNFs and TEs from TEKRABber's result.
+
+```{r}
+library(igraph)
+library(plyr)
+
+# load hm file
+load("intersect/db_tight.rda")
+load("intersect/katja_tight.rda")
+hm_db <- df_db_tight_split$hm
+hm_kat <- kat_tight_split$hm
+
+hm_db_select <- hm_db[hm_db$chromosome=="chr19",c("ZNF_ms", "te_name")]
+hm_kat_select <- hm_kat[,c("ZNF_ms", "te_name")]
+
+
+# select top40
+counts <- ddply(hm_db_select, .(hm_db_select$ZNF_ms, hm_db_select$te_name), nrow)
+names(counts) <- c("ZNF_ms", "te_name", "Count")
+counts <- counts[order(counts$Count, decreasing = TRUE),]
+```
+
+Human parallel (JASPAR) {data-navmenu="Bipartite"}
+================================================
+### Top 40 pairs Human (JASPAR & other database)
+```{r}
+g <- graph.data.frame(counts[c(1:40), ], directed = FALSE)
+V(g)$type <- bipartite_mapping(g)$type
+
+V(g)$color <- ifelse(V(g)$type, "lightgreen", "salmon")
+V(g)$shape <- ifelse(V(g)$type, "circle", "square")
+E(g)$color <- "lightgray"
+
+plot(g, layout=layout.bipartite, vertex.label.cex=0.6, vertex.label.color = "black")
+```
+
+Human bipartite (JASPAR) {data-navmenu="Bipartite"}
+==================================================
+### Top 40 pairs Human (JASPAR & other database)
+```{r}
+plot(g, vertex.label.cex = 0.8, vertex.label.color="black")
+```
+
