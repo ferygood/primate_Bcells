@@ -33,7 +33,7 @@ library(ggplot2)
 library(heatmaply)
 library(reshape2)
 
-pair_heatmap <- function(df, top=40, chr=NULL, lowCol="#d2e1b1", highCol="#bf8924"){
+pair_heatmap <- function(df, top=100, chr=NULL, lowCol="#d2e1b1", highCol="#bf8924"){
 
     if(!is.null(chr)){
         # filter chromosome
@@ -61,12 +61,38 @@ pair_heatmap <- function(df, top=40, chr=NULL, lowCol="#d2e1b1", highCol="#bf892
 }
 ```
 
+```{r bipartite}
+library(igraph)
+library(plyr)
+
+bipar <- function(df, top=100) {
+  
+  counts <- ddply(df, .(df$ZNF_ms, df$te_name), nrow)
+  names(counts) <- c("ZNF_ms", "te_name", "Count")
+  counts <- counts[order(counts$Count, decreasing = TRUE),]
+  
+  g <- graph.data.frame(counts[c(1:top), ], directed = FALSE)
+  V(g)$type <- bipartite_mapping(g)$type
+
+  V(g)$color <- ifelse(V(g)$type, "lightgreen", "salmon")
+  V(g)$shape <- ifelse(V(g)$type, "circle", "square")
+  E(g)$color <- "lightgray"
+
+  plot(g, vertex.label.cex = 0.8, vertex.label.color="black")
+  
+}
+```
+
 
 
 Intro {data-navmenu="Home"}
 =================================================
-We use `TEKRABber` to analyze the differntially expressed orthologs and also 
-analyze the correlations of KRAB-ZNFs and TEs. The data comes from human, 
+This dashboard is used to show results integrated from Yao's and Ana's.  
+1. Yao uses [`TEKRABber`](https://bioconductor.org/packages/3.15/bioc/html/TEKRABber.html) to analyze the differntially expressed orthologs and also 
+analyze the correlations of KRAB-ZNFs and TEs.  
+2. Ana uses [`matrix-scan`](http://rsat.sb-roscoff.fr/matrix-scan_form.cgi) with the data from the ChIP-seq. Locations of start/end positions are matched from both the TE's from Yao's and Ana's analysis. 
+
+The data comes from human, 
 chimpanzee, and orangutans B-cells RNA-seq data (3 biological replicates/ 
 each species). We comparing three species using human as references. 
 
@@ -77,7 +103,7 @@ Human (with Chimpanzee) {data-navmenu="Correlation Tables"}
 ### Human Correlation Table (with Chimpanzee)
 This table shows the correlation results from human which comparing with 
 Chimpanzee. There are total 101 rows of data and are filtered with padj less 
-than 0.05 and coefficients less than -0.7.
+than 0.05 and coefficients less than 0.
 ```{r}
 DT::datatable(
     hmchimpCorrSig,
@@ -95,7 +121,7 @@ Human (with Orangutan) {data-navmenu="Correlation Tables"}
 ### Human Correlation Table (with Orangutan)
 This table shows the correlation results from human which comparing with 
 Orangutans. There are total 16 rows of data and are filtered with padj less 
-than 0.05 and coefficients less than -0.7.
+than 0.05 and coefficients less than 0.
 ```{r}
 DT::datatable(
     hmoranCorrSig,
@@ -112,7 +138,7 @@ Human {data-navmenu="Correlation Tables"}
 ### Human Correlation Table (intersect from chimpanzee and orangutan group)
 This table shows the intersect of humans KRAB-ZNFs and TEs from comparing human 
 with chimpanzee and human with orangutans. The data has been filtered with padj 
-less than 0.05 and coefficients less than -0.7. There are total 13 rows of data.
+less than 0.05 and coefficients less than 0. There are total 13 rows of data.
 
 ```{r}
 DT::datatable(
@@ -129,7 +155,7 @@ DT::datatable(
 Chimpanzee {data-navmenu="Correlation Tables"}
 =================================================
 This table shows chimpanzees KRAB-ZNFs and TEs result with padj less than 0.05
-and coefficient less than -0.7.
+and coefficient less than 0.
 ```{r}
 DT::datatable(
     chimpCorrSig,
@@ -142,7 +168,7 @@ DT::datatable(
 Orangutans {data-navmenu="Correlation Tables"}
 =================================================
 This table shows orangutans KRAB-ZNFs and TEs result with padj less than 0.05
-and coefficient less than -0.7.
+and coefficient less than 0.
 ```{r}
 DT::datatable(
     oranCorrSig,
@@ -151,6 +177,34 @@ DT::datatable(
     filter = "top"
 )
 ```
+
+human (Ana's table) {data-navmenu="Intersect"}
+============================================================
+```{r}
+load("intersect/katja_tight.rda")
+hm_kat_tight <- kat_tight_split$hm
+hm_kat_tight <- head(hm_kat_tight[-c(1,2), ], 20) 
+DT::datatable(
+  hm_kat_tight,
+  fillContainer = FALSE,
+  options = list(bPaginate=TRUE, pageLength=5),
+  filter = "top"
+)
+```
+
+human (frequency) {data-navmenu="Intersect"}
+=============================================================
+```{r}
+df <- read.csv("intersect/hm_kat_repeat.csv")
+df <- df[order(df$Count, decreasing = TRUE),]
+DT::datatable(
+  head(df, 20),
+  fillContainer = FALSE,
+  options = list(bPaginate=TRUE, pageLength=5),
+  filter = "top"
+)
+```
+
 
 Intro {data-navmenu="Overlapped"}
 =================================================
@@ -184,26 +238,6 @@ pair_heatmap(hmdbTable)
 ```{r}
 hmkatTable <- read.csv("intersect/hm_kat_repeat.csv")
 pair_heatmap(hmkatTable)
-```
-
-Human (Ch19) {data-navmenu="Overlapped"}
-=================================================
-
-Column
--------------------------------------------------
-### Clustering pair counts in Human (JASPAR & other database) {data-padding=50}  
-We visualize the pair counts comparing motifs from KRAB-ZNFs and TEs from JASPAR 
-and TEKRABber results. Here we only show the top 40 counts.  
-```{r}
-hmdbTable <- read.csv("intersect/hm_db_repeat.csv")
-
-pair_heatmap(hmdbTable, chr="chr19")
-```
-
-### Clustering pair counts in Human (ChIP-Seq) {data-padding=50}  
-```{r}
-hmkatTable <- read.csv("intersect/hm_kat_repeat.csv")
-pair_heatmap(hmkatTable, chr="chr19")
 ```
 
 Chimpanzee {data-navmenu="Overlapped"}
@@ -260,44 +294,51 @@ the JASPAR Collection Unvalidated** and **collection of motifs assembled by
 Dogan et al**. Upon these four data are intersect by RNA-seq data result which 
 include significantly correlated KRAB-ZNFs and TEs from TEKRABber's result.
 
-```{r}
-library(igraph)
-library(plyr)
 
-# load hm file
-load("intersect/db_tight.rda")
-load("intersect/katja_tight.rda")
-hm_db <- df_db_tight_split$hm
-hm_kat <- kat_tight_split$hm
-
-hm_db_select <- hm_db[hm_db$chromosome=="chr19",c("ZNF_ms", "te_name")]
-hm_kat_select <- hm_kat[,c("ZNF_ms", "te_name")]
-
-
-# select top40
-counts <- ddply(hm_db_select, .(hm_db_select$ZNF_ms, hm_db_select$te_name), nrow)
-names(counts) <- c("ZNF_ms", "te_name", "Count")
-counts <- counts[order(counts$Count, decreasing = TRUE),]
-```
-
-Human parallel (JASPAR) {data-navmenu="Bipartite"}
+Human {data-navmenu="Bipartite"}
 ================================================
-### Top 40 pairs Human (JASPAR & other database)
+
+Row
+------------------------------------------------
+### Top 100 pairs Human (JASPAR & other database)
 ```{r}
-g <- graph.data.frame(counts[c(1:40), ], directed = FALSE)
-V(g)$type <- bipartite_mapping(g)$type
-
-V(g)$color <- ifelse(V(g)$type, "lightgreen", "salmon")
-V(g)$shape <- ifelse(V(g)$type, "circle", "square")
-E(g)$color <- "lightgray"
-
-plot(g, layout=layout.bipartite, vertex.label.cex=0.6, vertex.label.color = "black")
+bipar(hmdbTable, top=100)
 ```
 
-Human bipartite (JASPAR) {data-navmenu="Bipartite"}
-==================================================
-### Top 40 pairs Human (JASPAR & other database)
+
+### Top 100 pairs Human (ChIP-seq)
 ```{r}
-plot(g, vertex.label.cex = 0.8, vertex.label.color="black")
+bipar(hmkatTable, top=100)
 ```
 
+Chimpanzee {data-navmenu="Bipartite"}
+================================================
+
+Row
+------------------------------------------------
+### Top 100 pairs Human (JASPAR & other database)
+```{r}
+bipar(chimpdbTable, top=100)
+```
+
+
+### Top 100 pairs Human (ChIP-seq)
+```{r}
+bipar(chimpkatTable, top=100)
+```
+
+Orangutans {data-navmenu="Bipartite"}
+================================================
+
+Row
+------------------------------------------------
+### Top 100 pairs Human (JASPAR & other database)
+```{r}
+bipar(orandbTable, top=100)
+```
+
+
+### Top 100 pairs Human (ChIP-seq)
+```{r}
+bipar(orankatTable, top=100)
+```
