@@ -31,55 +31,58 @@ hmCorr <- hmchimpCorrSig[hmchimpCorrSig$geneName %in% hmoranCorrSig$geneName,]
 ```{r drawing heatmap}
 library(ggplot2)
 library(heatmaply)
-library(reshape2)
+library(tidyverse)
 
 pair_heatmap <- function(df, top=100, chr=NULL, lowCol="#d2e1b1", highCol="#bf8924"){
-
+    
     if(!is.null(chr)){
         # filter chromosome
         df <- df[df$chromosome==chr, ]
     }
     
-    # select top genes
-    df <- df[order(df$Count, decreasing=TRUE), ][seq_len(top), ]
-    df <- df[, c("ZNF_ms", "te_name", "Count")]
-    dft <- dcast(df, te_name~ZNF_ms, value.var="Count", sum)
-    rownames(dft) <- dft$te_name
-    dft <- dft[-1]
-    dft[is.na(dft)] <- 0
+    df <- df[,c("ZNF_ms", "te_name", "Count")]
+    df <- aggregate(Count~., df, FUN=sum) %>%
+        arrange(desc(Count)) %>%
+        head(top)
+    df <- pivot_wider(df, names_from = ZNF_ms, values_from = Count, values_fill = 0)
+    df_count <- df[-1]
+    rownames(df_count) <- df$te_name
     
     #figPath <- file.path(figDir, figName)
     
-    
-    heatmaply(as.matrix(dft), 
+    heatmaply(as.matrix(df_count), 
               colors = c(low=lowCol, high=highCol),
               xlab="KRAB-ZNFs",
               ylab="TEs"
     )
     
-
 }
 ```
 
 ```{r bipartite}
 library(igraph)
-library(plyr)
 
-bipar <- function(df, top=100) {
-  
-  counts <- ddply(df, .(df$ZNF_ms, df$te_name), nrow)
-  names(counts) <- c("ZNF_ms", "te_name", "Count")
-  counts <- counts[order(counts$Count, decreasing = TRUE),]
-  
-  g <- graph.data.frame(counts[c(1:top), ], directed = FALSE)
-  V(g)$type <- bipartite_mapping(g)$type
+bipar <- function(df, top=100, filename=NULL) {
+    
+    df <- df[, c("ZNF_ms", "te_name", "Count")]
+    df_select <- aggregate(Count ~., df, FUN=sum) %>%
+        arrange(desc(Count)) %>%
+        head(top)
+    
+    g <- graph.data.frame(df_select[,c("ZNF_ms", "te_name")], directed = FALSE)
+    V(g)$type <- bipartite_mapping(g)$type
+    
+    V(g)$color <- ifelse(V(g)$type, "lightgreen", "salmon")
+    V(g)$shape <- ifelse(V(g)$type, "circle", "square")
+    E(g)$color <- "lightgray"
+    
+    if (!is.null(filename)) {
+        pdf(filename, 10,10)
+        igraph.options(plot.layout=layout.graphopt, vertex.size=13)
+        plot(g, vertex.label.cex = 0.8, vertex.label.color="black")
+    }
 
-  V(g)$color <- ifelse(V(g)$type, "lightgreen", "salmon")
-  V(g)$shape <- ifelse(V(g)$type, "circle", "square")
-  E(g)$color <- "lightgray"
-
-  plot(g, vertex.label.cex = 0.8, vertex.label.color="black")
-  
+    plot(g, vertex.label.cex = 0.8, vertex.label.color="black")
 }
 ```
 
@@ -228,6 +231,7 @@ Column
 ### Clustering pair counts in Human (JASPAR & other database) {data-padding=50}  
 We visualize the pair counts comparing motifs from KRAB-ZNFs and TEs from JASPAR 
 and TEKRABber results. Here we only show the top 40 counts.  
+
 ```{r}
 hmdbTable <- read.csv("intersect/hm_db_repeat.csv")
 
@@ -302,12 +306,14 @@ Row
 ------------------------------------------------
 ### Top 100 pairs Human (JASPAR & other database)
 ```{r}
+#bipar(hmdbTable, top=100, filename="top100hmdb.pdf")
 bipar(hmdbTable, top=100)
 ```
 
 
 ### Top 100 pairs Human (ChIP-seq)
 ```{r}
+#bipar(hmkatTable, top=100, filename="top100hmChIPseq.pdf")
 bipar(hmkatTable, top=100)
 ```
 
@@ -318,13 +324,16 @@ Row
 ------------------------------------------------
 ### Top 100 pairs Human (JASPAR & other database)
 ```{r}
+#bipar(chimpdbTable, top=100, filename="top100chimpdb.pdf")
 bipar(chimpdbTable, top=100)
 ```
 
 
 ### Top 100 pairs Human (ChIP-seq)
 ```{r}
+#bipar(chimpkatTable, top=100, filename="top100chimpChIPseq.pdf")
 bipar(chimpkatTable, top=100)
+
 ```
 
 Orangutans {data-navmenu="Bipartite"}
@@ -334,11 +343,15 @@ Row
 ------------------------------------------------
 ### Top 100 pairs Human (JASPAR & other database)
 ```{r}
+#bipar(orandbTable, top=100, filename = "top100orandb.pdf")
 bipar(orandbTable, top=100)
+
 ```
 
 
 ### Top 100 pairs Human (ChIP-seq)
 ```{r}
+#bipar(orankatTable, top=100, filename="top100oranChIPseq.pdf")
 bipar(orankatTable, top=100)
+
 ```
