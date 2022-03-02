@@ -1,0 +1,95 @@
+---
+title: "007_subset_coordinate"
+author: "yao"
+date: "3/2/2022"
+output: html_document
+---
+In this file, I will select the coordinates and send them to anna to do the analysis again.
+(1) Subset only the information from hg19 ensGene and rmsk file.
+(2) Subsets the name of gene and TEs from TEKRABber result
+(3) Generate 6 tables for Ana (human (gene, te), chimpanzee (gene, te), oran (gene, te))
+
+```{r load reference file}
+library(dplyr)
+# hg19 gene reference
+hg19gtf <- rtracklayer::import('../hg19.ensGene.gtf')
+hg19ens <- as.data.frame(hg19gtf)
+
+# hg19 TE reference
+hg19rmskgtf <- rtracklayer::import('../hg19_rmsk_TE.gtf')
+hg19rmsk <- Repitools::annoGR2DF(hg19rmskgtf)
+
+# rearrange the data 
+hg19ensTable <- hg19ens[,c("gene_id", "seqnames", "start", "end")]
+hg19rmskTable <- hg19rmsk[, c("gene_id", "chr", "start", "end")]
+
+```
+
+```{r convert ID}
+# convert id to gene name 
+library(gprofiler2)
+geneName <- gconvert(query = unique(hg19ensTable$gene_id), 
+                     organism = "hsapiens",target="ENSG",
+                     mthreshold = Inf, filter_na = TRUE)
+
+hg19ensTableMerge <- merge(geneName[,c("input", "name")], hg19ensTable,
+                           by.x = "input", by.y="gene_id")
+
+```
+
+Then we filter our data, but we write a function and load the data first.
+```{r}
+sigData <- function(df, refTable, filterTE=FALSE) {
+    
+    df <- df %>% 
+            filter(pvalue < 0.05)
+    
+    df.output <- data.frame()
+    
+    if (filterTE==FALSE) {
+        df.output <- refTable[refTable$name %in% df$geneName, ]
+    } else if (filterTE==TRUE) {
+        df.output <- refTable[refTable$gene_id %in% df$teName, ]
+    }  
+    
+    df.output <- df.output[!duplicated(df.output), ]
+    df.output
+}
+
+hmchimpCorr <- read.csv("hmchimp_results/hmCorrResult.csv")
+chimpCorr <- read.csv("hmchimp_results/chimpCorrResult.csv")
+hmoranCorr <- read.csv("hmoran_results/hmCorrResult.csv")
+oranCorr <- read.csv("hmoran_results/hmCorrResult.csv")
+```
+
+
+```{r filter human data}
+hmchimpGene <- sigData(hmchimpCorr, hg19ensTableMerge, filterTE = FALSE)
+hmchimpTE <- sigData(hmchimpCorr, hg19rmskTable, filterTE = TRUE)
+
+hmoranGene <- sigData(hmoranCorr, hg19ensTableMerge, filterTE = FALSE)
+hmoranTE <- sigData(hmoranCorr, hg19rmskTable, filterTE = TRUE)
+
+hmGeneMerge <- full_join(hmchimpGene, hmoranGene)
+hmTEMerge <- full_join(hmchimpTE, hmoranTE)
+```
+```{r filter chimpanzee and orangutan data}
+#chimpanzee
+chimpGene <- sigData(chimpCorr, hg19ensTableMerge, filterTE = FALSE)
+chimpTE <- sigData(chimpCorr, hg19rmskTable, filterTE = TRUE)
+
+#orangutan
+oranGene <- sigData(oranCorr, hg19ensTableMerge, filterTE = FALSE)
+oranTE <- sigData(oranCorr, hg19rmskTable, filterTE = TRUE)
+```
+
+Finally, save the six tables
+```{r}
+write.table(hmGeneMerge, file = "coordinates/hmKZNFsCorrd.csv", sep=",")
+write.table(hmTEMerge, file = "coordinates/hmTEsCoord.csv", sep=",")
+write.table(chimpGene, file = "coordinates/chimpKZNFsCorrd.csv", sep=",")
+write.table(chimpTE, file = "coordinates/chimpTEsCorrd.csv", sep=",")
+write.table(oranGene, file="coordinates/oranKZNFsCoord.csv", sep=",")
+write.table(oranTE, file="coordinates/oranTEsCoord.csv", sep=",")
+```
+
