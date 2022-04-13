@@ -4,13 +4,17 @@ author: "yao"
 date: "4/12/2022"
 output: html_document
 ---
-Load `twice` and other libraries.
+Load `twice` and other libraries. You need to load `plyr` first and then 
+`dplyr` to avoid conflict.
 
 ```{r}
 library(twice)
+library(plyr)
 library(dplyr)
 ```
-Load data:
+
+The first part, we visualize the differentially expressed krab-znfs comparing
+in three species. Load gene expression data and human krab-znfs reference:
 ```{r}
 hmchimp <- read.csv("~/github/kap1/hmchimp_results/geneDESeq2Log2.csv")
 hmoran <- read.csv("~/github/kap1/hmoran_results/geneDESeq2Log2.csv")
@@ -18,7 +22,7 @@ data("hmKZNFs337")
 
 ```
 
-Filter KZNFs and merge by rownames to keep all
+Filter gene expression to keep only KZNFs and merge by rownames to keep all.
 ```{r}
 hmchimp <- hmchimp[rownames(hmchimp)%in%hmKZNFs337$ensembl_gene_id,]
 hmoran <- hmoran[rownames(hmoran) %in% hmKZNFs337$ensembl_gene_id,]
@@ -46,7 +50,7 @@ kznfsComplexHeatmap(log2df)
 ```
 
 
-Next part is to visualize transposable elements
+Second part is to visualize transposable elements
 Load differentially expressed TEs files and select DE TEs in a list `te_list`
 ```{r}
 # select de genes in human vs. chimpanzee
@@ -61,7 +65,7 @@ hmchimpTEres_de_list <- rownames(hmchimpTEres_de)
 hmoranTEres <- read.csv("~/github/kap1/hmoran_results/teDESeq2results.csv")
 hmoranTEres_de <- hmoranTEres %>%
     filter(padj < 0.05) %>%
-    filter(abs(log2FoldChange)>1.2)
+    filter(abs(log2FoldChange) > 1.2)
 hmoranTEres_de_list <- rownames(hmoranTEres_de)
 
 # combined data
@@ -84,7 +88,8 @@ teComplexHeatmap(as.matrix(log2(dfTE)), fileName = "~/TotalbCellsDETEHeatmap", t
 
 ```
 
-Next, we visualize and classified TEs based on class levels
+Next, we visualize and classified TEs based on class levels to have a better 
+resolution in each family.
 ```{r}
 data(hg19rmsk_info)
 
@@ -92,7 +97,8 @@ hg19rmsk_de <- hg19rmsk_info[hg19rmsk_info$gene_id %in% te_list, ]
 
 ```
 
-Create transposable elements class lists to filter data
+Create transposable elements class lists to filter data. Here we separate to 
+LTR and non-LTR because LTR has 56 rows and the others are total 39 rows
 ```{r}
 hg19_LTR_de <- hg19rmsk_de[hg19rmsk_de$class_id == "LTR", ] #56
 hg19_non_LTR_de <- hg19rmsk_de[hg19rmsk_de$class_id != "LTR", ] #39
@@ -100,13 +106,25 @@ hg19_non_LTR_de <- hg19rmsk_de[hg19rmsk_de$class_id != "LTR", ] #39
 ```
 
 
+Normalized expression data with log2(x+1), and visualize differentailly 
+expressed LTR, non-LTR TEs.
+```{r}
+dfTElog2 <- as.matrix(log2(dfTE + 1))
 
+teComplexHeatmap(
+    dfTElog2,
+    teFilter = hg19_non_LTR_de$gene_id,
+    teAnnot = hg19_non_LTR_de,
+    fileName = "img/deTEsnonLTR.pdf"
+)
+```
 ```{r}
 teComplexHeatmap(
-    as.matrix(log2(dfTE)),
-    teFilter = hg19_non_LTR_de$gene_id,
-    speciesAnnot = c("Hs", "Hs", "Hs", "Pt", "Pt", "Pt", "Pa", "Pa", "Pa"),
-    teAnnot = hg19_non_LTR_de
+    dfTElog2,
+    teFilter = hg19_LTR_de$gene_id,
+    top = 56,
+    teAnnot = hg19_LTR_de[,c(1,2)],
+    fileName = "img/deTEsLTR.pdf"
 )
 ```
 
