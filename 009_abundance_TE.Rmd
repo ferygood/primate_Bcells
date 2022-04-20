@@ -1,0 +1,29 @@
+---
+title: "009_abundance_TE"
+author: "yao"
+date: "4/20/2022"
+output: html_document
+---
+
+Here we calculate the average abundance of transposable elements:
+
+```{r}
+library(tidyverse)
+```
+import transposable elements data
+```{r}
+hmTE <- read.csv("counts/hm_te.csv")
+chimpTE <- read.csv("counts/chimp_te.csv")
+oranTE <- read.csv("counts/oran_te.csv")
+```
+
+```{r}
+sumHmTE <- sum(hmTE[,c(4,5,6)])
+sumChimpTE <- sum(chimpTE[,c(4,5,6)])
+sumOranTE <- sum(oranTE[,c(4,5,6)])
+
+sumChimpTE/sumHmTE
+sumOranTE/sumHmTE
+```
+
+

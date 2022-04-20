@@ -102,3 +102,16 @@ chimpCorrResult <- corrOrthologTE(
 
 ```
 
+Interpret results
+
+```{r}
+hmCorrResult <- read.csv("hmchimp_results/hmCorrResult.csv")
+
+hmCorrResult.sig <- hmCorrResult %>% 
+  filter(padj < 0.05)
+
+length(unique(hmCorrResult.sig$geneName))
+length(unique(hmCorrResult.sig$teName))
+
+```
+

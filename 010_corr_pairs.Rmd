@@ -1,0 +1,74 @@
+---
+title: "010_TEKRABber_corr_vis"
+author: "yao"
+date: "4/20/2022"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+theme_set(
+    theme_classic() +
+        theme(legend.position="top")
+)
+```
+
+
+```{r}
+dfhmchimp <- data.frame(
+    corr=c(rep(c("positive", "negative"), 2)),
+    species = factor(c("H", "H", "C", "C"), levels=c("H", "C")), 
+    pairs=c(73, 101, 109, 46)
+)
+
+(dfhmchimp)
+
+# plot
+p1 <- ggplot(dfhmchimp, aes(x=species, y=pairs)) +
+    geom_col(aes(color=corr, fill=corr), position=position_dodge(0.8), width=0.7) +
+    scale_fill_manual(values = c("#9999FF", "#FF6666")) +
+    scale_color_manual(values = c("#9999FF", "#FF6666"))
+
+p1 <- p1 + geom_text(
+    aes(label = pairs, group = corr),
+    position = position_dodge(0.8),
+    vjust = -0.3, size = 3.5
+)
+
+p1
+```
+
+```{r}
+dfhmoran <- data.frame(
+    corr=c(rep(c("positive", "negative"), 2)),
+    species = c("H", "H", "O", "O"), 
+    pairs=c(7, 16, 68, 62)
+)
+
+(dfhmoran)
+
+# plot
+p2 <- ggplot(dfhmoran, aes(x=species, y=pairs)) +
+    geom_col(aes(color=corr, fill=corr), position=position_dodge(0.8), width=0.7) +
+    scale_fill_manual(values = c("#9999FF", "#FF6666")) +
+    scale_color_manual(values = c("#9999FF", "#FF6666"))
+
+p2 <- p2 + geom_text(
+    aes(label = pairs, group = corr),
+    position = position_dodge(0.8),
+    vjust = -0.3, size = 3.5
+)
+
+p2
+
+```
+```{r}
+g <- ggarrange(
+    p1, p2, labels = c("A", "B"),
+    common.legend = TRUE, legned = "bottom"
+)
+
+ggsave(g, height = 7, file="corr_pairs_barplot.pdf")
+```
+
