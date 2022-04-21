@@ -114,4 +114,12 @@ length(unique(hmCorrResult.sig$geneName))
 length(unique(hmCorrResult.sig$teName))
 
 ```
+```{r}
+chimpCorrResult <- read.csv("hmchimp_results/chimpCorrResult.csv")
+chimpCorrResult.sig <- chimpCorrResult %>%
+  filter(padj < 0.05)
+
+length(unique(chimpCorrResult.sig$geneName))
+length(unique(chimpCorrResult.sig$teName))
+```
 
