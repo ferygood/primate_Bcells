@@ -113,7 +113,16 @@ hmCorrResult.sig <- hmCorrResult %>%
 length(unique(hmCorrResult.sig$geneName))
 length(unique(hmCorrResult.sig$teName))
 
+hmCorrResult.sig.positive <- hmCorrResult.sig %>%
+  filter(coef > 0) 
+
+hmCorrResult.sig.negative <- hmCorrResult.sig %>%
+  filter(coef < 0)
+
 ```
+
+
+
 ```{r}
 chimpCorrResult <- read.csv("hmchimp_results/chimpCorrResult.csv")
 chimpCorrResult.sig <- chimpCorrResult %>%
