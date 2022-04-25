@@ -94,6 +94,13 @@ This dashboard is used to show results integrated from Yao's and Ana's.
 1. Yao uses [`TEKRABber`](https://bioconductor.org/packages/3.15/bioc/html/TEKRABber.html) to analyze the differntially expressed orthologs and also 
 analyze the correlations of KRAB-ZNFs and TEs.  
 2. Ana uses [`matrix-scan`](http://rsat.sb-roscoff.fr/matrix-scan_form.cgi) with the data from the ChIP-seq. Locations of start/end positions are matched from both the TE's from Yao's and Ana's analysis. 
+3. The detail KZNF and TE pairs information comparing:  
+- Human vs. Chimpanzee  
+<p><a href="hmchimp_results/hmKZNFsTEsPairs.html">Human pairs</a></p>
+<p><a href="hmchimp_results/chimpKZNFsTEsPairs.html">Chimpanzee pairs</a></p><br>
+- Human vs. Orangutan
+<p><a href="hmoran_results/hmKZNFsTEsPairs.html">Human pairs</a></p>
+<p><a href="hmoran_results/oranKZNFsTEsPairs.html">Orangutan pairs</a></p><br>
 
 The data comes from human, 
 chimpanzee, and orangutans B-cells RNA-seq data (3 biological replicates/ 
