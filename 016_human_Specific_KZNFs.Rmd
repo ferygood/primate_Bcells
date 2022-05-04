@@ -57,6 +57,8 @@ hmCorrResult <- corrOrthologTE(
     corrMethod = "pearson",
     padjMethod = "fdr"
 )
+
+write.table(hmCorrResult, file="hm_results/hmCorrResult81.csv", sep=",")
 ```
 
 By using `TEKRABber::corrOrthologTE()`, we can obtain 81*992 result in 10 
