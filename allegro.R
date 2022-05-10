@@ -1,26 +1,7 @@
----
-title: "018_correlation_percentage"
-author: "yao"
-date: '2022-05-10'
-output: html_document
----
-
-Here we try to shuffle data to see the gene have negative or positive 
-correlations comparing to approx. 50% KRAB-ZNFs (42 out of 81) in human. 
-Design:  
-1. remove krab-znfs from data
-2. 
-
-Load pacakge
-```{r}
 library(TEKRABber)
 library(twice)
 library(dplyr)
-```
 
-Load data and transform to the format for `corrOrthologTE()`
-
-```{r}
 data("hmKZNFs337")
 gene <- read.csv("counts/hm_gene.csv")
 te <- read.csv("counts/hm_te.csv")
@@ -34,11 +15,6 @@ gene_filter <- gene_filter[,c(2,3,4)]
 rownames(te) <- te$name
 te <- te[,c(4,5,6)]
 
-```
-
-Here we set `set.seed(84)` for reproducibility, and calculate correlation.
-
-```{r}
 set.seed(84)
 
 iter <- c()
@@ -67,6 +43,5 @@ df_output <- data.frame(
     per = percentage
 )
 
-```
 
-
+write.table(df_output, file="hm_results/percentage_result/percentage.csv", sep = ",")
