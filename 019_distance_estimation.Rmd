@@ -1,0 +1,140 @@
+---
+title: "019_distance_estimation"
+author: "yao"
+date: '2022-05-11'
+output: html_document
+---
+
+In this analysis, we want to see if negative or positive correlation between KRAB-ZNFs and TEs are related to their distance on chromosome. We only can compare KRAB-ZNFs and TEs on the same chromosome.
+1. Extract positive/negative correlation pairs from human data
+2. Filter them from coordinates reference
+3. caculate distance and save results as a dataframe
+
+```{r}
+library(twice)
+library(dplyr)
+library(biomaRt)
+```
+
+
+### Extract positive / negative correlation pairs
+
+```{r}
+hmCorr <- read.csv("hm_results/hmCorrResult81.csv")
+hmCorr.sig <- hmCorr %>%
+    filter(padj < 0.05)
+hmCorr.sig$geneName[1]
+hmCorr.sig$teName[1]
+```
+### filter them from coordinates reference
+#### Load coordinate data
+You can find tutorial [here](http://grch37.ensembl.org/info/data/biomart/biomart_r_package.html)
+```{r}
+# get significant znfs and TEs name
+znfs <- unique(hmCorr.sig$geneName)
+tes <- unique(hmCorr.sig$teName)
+
+# get hg19 coordinates information
+grch37 <- useEnsembl(biomart = "ensembl", GRCh=37) 
+listDatasets(grch37)
+
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl", GRCh=37)
+
+ensembl_gene <- getBM(
+    attributes = c('ensembl_gene_id',
+                   'hgnc_symbol',
+                   'chromosome_name',
+                   'start_position',
+                   'end_position'),
+    mart = ensembl
+)
+
+
+# filter znfs
+ensembl_gene_znfs <- ensembl_gene[ensembl_gene$hgnc_symbol %in% znfs, ]
+ensembl_gene_znfs[42, "chromosome_name"] <- "19" #modified previous unknown result
+
+```
+
+#### Load TE coordinate
+
+we based on the chromosome number and te name from correlation result to filter some data
+```{r}
+data("hg19rmsk_gtf")
+
+chr_list <- unique(ensembl_gene_znfs$chromosome_name)
+
+#filter chromosome
+df_te <- hg19rmsk_gtf
+df_te$seqnames <- substr(df_te$seqnames, 4, length(df_te$seqnames)) # remove chr
+df_te <- df_te %>% 
+    filter(seqnames %in% unique(ensembl_gene_znfs$chromosome_name)) %>%
+    filter(gene_id %in% tes)
+
+```
+
+#### Now the input data are ready and we can now write algorithm
+```{r include=FALSE}
+# 1. iterate through chr number
+# 2. calculate mean value and decide which will be first and second
+# 4. calculate distance and add rows to dataframe
+
+# initialize an empty dataframe
+df <- data.frame(
+    Chr = character(),
+    KRAB_ZNFs = character(),
+    TEs = character(),
+    distance = numeric(),
+    pos_or_neg = character()
+)
+
+for (chr in chr_list){
+    
+    dfGene <- ensembl_gene_znfs[ensembl_gene_znfs$chromosome_name==chr, ]
+    dfTE <- df_te[df_te$seqnames==chr, ]
+    df_idx <- 0
+    
+    for (i in 1:nrow(dfGene)){
+        for (j in 1:nrow(dfTE)){
+
+            geneMean <- mean(c(dfGene$start_position[i], dfGene$end_position[i]))
+            teMean <- mean(c(dfTE$start[j], dfTE$end[j]))
+            dis <- 0
+            
+            # check if the data exist in the correlation table
+            check_status <- hmCorr.sig[
+                hmCorr.sig$geneName==dfGene$hgnc_symbol[i] &
+                    hmCorr.sig$teName==dfTE$gene_id[j],
+            ]
+            
+            if (nrow(check_status)>0) {
+
+                if (geneMean > teMean){
+                    dis <- dfGene$start_position[i] - dfTE$end[j]
+                } else {
+                    dis <- dfTE$start[j] - dfGene$end_position[i]
+                }
+
+                coef <- hmCorr.sig[hmCorr.sig$geneName==dfGene$hgnc_symbol[i] &
+                                       hmCorr.sig$teName==dfTE$gene_id[j], "coef"]
+                
+                coef_result <- ifelse(coef>0, "pos", "neg")
+                
+                df_idx <- df_idx + 1
+                df[df_idx, ] <- c(
+                    chr,
+                    dfGene$hgnc_symbol[i],
+                    dfTE$gene_id[j],
+                    dis,
+                    ifelse(coef>0, "pos", "neg")
+                )
+            }
+        }
+    }
+
+}
+
+```
+
+
+
