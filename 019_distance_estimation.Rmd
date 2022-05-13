@@ -68,7 +68,7 @@ chr_list <- unique(ensembl_gene_znfs$chromosome_name)
 df_te <- hg19rmsk_gtf
 df_te$seqnames <- substr(df_te$seqnames, 4, length(df_te$seqnames)) # remove chr
 df_te <- df_te %>% 
-    filter(seqnames %in% unique(ensembl_gene_znfs$chromosome_name)) %>%
+    filter(seqnames %in% chr_list) %>%
     filter(gene_id %in% tes)
 
 ```
@@ -134,7 +134,51 @@ for (chr in chr_list){
 
 }
 
+df$distance <- as.numeric(df$distance)
+
+write.table(df, "hm_results/kznfsTEs_distance.csv", sep=",")
+```
+
+#### Visualize the results
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(hrbrthemes)
+library(viridis)
+```
+```{r}
+# ZNF782
+znf782 <- df %>%
+    filter(KRAB_ZNFs=="ZNF782") %>%
+    mutate(distance = log2(distance))
+
+p.znf782 <- znf782 %>%
+  ggplot( aes(x=distance, fill=pos_or_neg)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'identity') +
+    scale_fill_manual(values=c("#69b3a2", "#404080")) +
+    theme_ipsum() +
+    labs(fill="")
+
+p.znf782
 ```
 
 
+
+```{r}
+ggplot(df, aes(x=KRAB_ZNFs, y=distance/1000000, fill=pos_or_neg)) +
+    geom_boxplot() +
+    theme_ipsum_tw(base_size=14) +
+    xlab("KRAB-ZNFs") +
+    ylab("distance(bp/1e+06)")
+```
+#### Density plot
+```{r}
+ggplot(df, aes(x=distance/1000000, group=pos_or_neg, fill=pos_or_neg)) +
+    geom_density(adjust=1.5, alpha=.4) +
+    theme_ipsum(
+        base_size = 16
+    ) + 
+    xlab("distance(bp/1e+06)")
+```
 
