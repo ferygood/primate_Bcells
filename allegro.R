@@ -1,6 +1,9 @@
+.libPaths('/home/yaochung41/R/x86_64-pc-linux-gnu-library/4.2')
+
 library(TEKRABber)
 library(twice)
 library(dplyr)
+
 
 data("hmKZNFs337")
 gene <- read.csv("counts/hm_gene.csv")
@@ -20,7 +23,7 @@ set.seed(84)
 iter <- c()
 percentage <- c()
 
-for (i in 1:3){
+for (i in 1:1000){
     idx <- sample(8838, size=80)
     gene_table <- gene_filter[idx, ]
     #myfile <- paste0(format(Sys.time(), "%s_%b_%d", ".csv"))
@@ -44,4 +47,4 @@ df_output <- data.frame(
 )
 
 
-write.table(df_output, file="hm_results/percentage_result/percentage.csv", sep = ",")
+write.table(df_output, file="hm_results/percentage_result_1000/percentage.csv", sep = ",")
