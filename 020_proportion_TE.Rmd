@@ -1,0 +1,155 @@
+---
+title: "020_proportion_TE"
+author: "yao"
+date: '2022-06-02'
+output: html_document
+---
+
+```{r}
+library(twice)
+library(dplyr)
+library(ggplot2)
+library(hrbrthemes)
+```
+
+Load TE data from human, chimpanzee, orangutan respectively.
+First analyze human data:
+
+```{r}
+# load hmTE
+hmTE <- read.csv("counts/hm_te.csv")
+hmCorr <- read.csv("hm_results/hmCorrResult81.csv")
+
+# select significant result and obtain TE name in list
+hmCorr.sig <- hmCorr %>% filter(padj<0.05)
+hm_te_list <- unique(hmCorr.sig$teName)
+
+# percentage of expression
+te_all_sum <- sum(colSums(hmTE[,c(4,5,6)]))
+te_select_sum <- sum(colSums(hmTE[hmTE$name %in% hm_te_list, c(4,5,6)]))
+te_select_sum / te_all_sum
+
+# visualize 
+hmTE <- hmTE %>% mutate(mean = (GM18558 + GM18960 + GM19240)/3)
+hmTE$group <- ifelse(hmTE$name %in% hm_te_list, "KZNFs-TEs", "other-TEs")
+p1 <- hmTE %>%
+    ggplot(aes(x=log2(mean + 1), fill=group)) +
+    geom_histogram(color="#e9ecef", alpha=0.6, position='identity') +
+    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    labs(fill="", tag = "A") +
+    ggtitle("human") +
+    theme_light()
+
+p1 <- p1 + 
+    coord_cartesian(xlim = c(0, 15), ylim=c(0, 125)) +
+    theme(
+        legend.text = element_text(size=12),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_text(size=12),
+        plot.title = element_text(hjust=0.5),
+        legend.spacing.x = unit(0.5, 'cm')
+    ) 
+    
+```
+
+Second analyze chimpanzee data:
+```{r}
+chimpTE <- read.csv("counts/chimp_te.csv")
+chimpCorr <- read.csv("hmchimp_results/chimpCorrResult.csv")
+
+chimpCorr.sig <- chimpCorr %>% filter(padj<0.05) 
+chimp_te_list <- unique(chimpCorr.sig$teName) #83
+
+# percentage of expression
+te_all_sum <- sum(colSums(chimpTE[,c(4,5,6)]))
+te_select_sum <- sum(colSums(chimpTE[chimpTE$name %in% chimp_te_list, c(4,5,6)]))
+te_select_sum / te_all_sum
+
+chimpTE <- chimpTE %>% mutate(mean = (Judith+Leo+Maryke)/3)
+chimpTE$group <- ifelse(chimpTE$name %in% chimp_te_list, "KZNFs-TEs", "other-TEs")
+
+p2 <- chimpTE %>%
+    ggplot(aes(x=log2(mean + 1), fill=group)) +
+    geom_histogram(color="#e9ecef", alpha=0.6, position='identity') +
+    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    labs(fill="", tag = "B") +
+    ggtitle("chimpanzee") +
+    theme_light()
+
+p2 <- p2 + 
+    coord_cartesian(xlim = c(0, 15), ylim=c(0, 125)) +
+    theme(
+        legend.text = element_text(size=12),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_text(size=12),
+        plot.title = element_text(hjust=0.5),
+        legend.spacing.x = unit(0.5, 'cm')
+    ) 
+```
+
+Third analyze orangutan data:
+```{r}
+oranTE <- read.csv("counts/oran_te.csv")
+oranCorr <- read.csv("hmoran_results/oranCorrResult.csv")
+
+oranCorr.sig <- oranCorr %>% filter(padj<0.05) 
+oran_te_list <- unique(oranCorr.sig$teName) #69
+
+# percentage of expression
+te_all_sum <- sum(colSums(oranTE[,c(4,5,6)]))
+te_select_sum <- sum(colSums(oranTE[oranTE$name %in% oran_te_list, c(4,5,6)]))
+te_select_sum / te_all_sum
+
+oranTE <- oranTE %>% mutate(mean = (Guchi+Jaqo+Jingjing)/3)
+
+oranTE$group <- ifelse(oranTE$name %in% oran_te_list, "KZNFs-TEs", "other-TEs")
+
+p3 <- oranTE %>%
+    ggplot(aes(x=log2(mean + 1), fill=group)) +
+    geom_histogram(color="#e9ecef", alpha=0.6, position='identity') +
+    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    labs(fill="", tag = "C") +
+    ggtitle("orangutan") +
+    theme_light()
+
+p3 <- p3 + 
+    coord_cartesian(xlim = c(0, 15), ylim=c(0, 125)) +
+    theme(
+        legend.text = element_text(size=12),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_text(size=12),
+        plot.title = element_text(hjust=0.5),
+        legend.spacing.x = unit(0.5, 'cm')
+    ) 
+```
+
+```{r}
+library(ggpubr)
+
+g <- ggarrange(
+    p1, p2, p3, common.legend = TRUE, 
+    ncol = 3, nrow = 1, legend = "bottom",
+    font.label = list(size=12))
+
+ggsave(g, height = 4, width = 12, filename = "~/Desktop/test.jpg", dpi=400, bg="white")
+```
+
+```{r}
+figure <- ggarrange(
+    p1 + rremove("ylab") + rremove("xlab"), 
+    p2 + rremove("ylab") + rremove("xlab"),
+    p3 + rremove("ylab") + rremove("xlab"), 
+    labels = NULL, ncol = 3, nrow = 1,
+    common.legend = TRUE, legend = "bottom",
+    align = "hv", 
+    font.label = list(
+        size = 10, color = "black", face = "bold", 
+        family = NULL, position = "top")
+    )
+
+annotate_figure(figure, left = textGrob("Common y-axis", rot = 90, vjust = 1, gp = gpar(cex = 1.3)),
+                    bottom = textGrob("Common x-axis", gp = gpar(cex = 1.3)))
+```
+
+
+
