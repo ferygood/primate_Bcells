@@ -1,0 +1,27 @@
+--- 
+title: "KAP1-KRAB-ZNFs manuscript"
+author: "Yao-Chung"
+date: "`r Sys.Date()`"
+site: bookdown::bookdown_site
+documentclass: book
+bibliography: [book.bib, packages.bib]
+# url: your book url like https://bookdown.org/yihui/bookdown
+# cover-image: path to the social sharing image like images/cover.jpg
+description: |
+  This is a book containg the analysis done by Yao-Chung for KAP1-KRAB-ZNFs 
+  manuscript.
+link-citations: yes
+#github-repo: rstudio/bookdown-demo
+---
+# Introduction
+Here you can review the analysis of KRAB-ZNFs-TEs from RNA-seq data from human,
+chimpanzee, and orangutan B cells.
+
+
+
+```{r include=FALSE}
+# automatically create a bib database for R packages
+knitr::write_bib(c(
+  .packages(), 'bookdown', 'knitr', 'rmarkdown'
+), 'packages.bib')
+```

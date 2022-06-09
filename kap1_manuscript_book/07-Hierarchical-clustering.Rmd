@@ -1,0 +1,128 @@
+# Hierarchical clustering
+
+Load `twice` and other libraries. You need to load `plyr` first and then 
+`dplyr` to avoid conflict. In this chapter, we visualize the expression of gene
+and te using Hierarchical clustering. The R script of this file can be found 
+at `07-Hierarchical-clustering.Rmd`.
+
+```{r, warning=FALSE}
+library(twice)
+library(plyr)
+library(dplyr)
+```
+
+The first part, we visualize the differentially expressed krab-znfs comparing
+in three species. Load gene expression data and human krab-znfs reference:
+```{r}
+hmchimp <- read.csv("results/hmchimp/geneDESeq2norm.csv")
+hmoran <- read.csv("results/hmoran/geneDESeq2norm.csv")
+data(hmKZNFs337)
+
+```
+
+Filter gene expression to keep only KZNFs and merge by rownames to keep all.
+```{r}
+hmchimp <- hmchimp[rownames(hmchimp)%in%hmKZNFs337$ensembl_gene_id,]
+hmoran <- hmoran[rownames(hmoran) %in% hmKZNFs337$ensembl_gene_id,]
+
+repeatList <- intersect(rownames(hmchimp), rownames(hmoran))
+hmoran <- hmoran[!rownames(hmoran) %in% repeatList, ]
+
+```
+
+Bind all three species sample together
+```{r}
+df <- rbind.fill(hmchimp, hmoran)
+
+rownames(df) <- c(rownames(hmchimp), rownames(hmoran))
+colnames(df) <- c("H1", "H2", "H3", "C1", "C2", "C3", "O1", "O2", "O3")
+
+```
+
+Normalized in log2 scale and visualize the heatmap.
+```{r}
+log2df <- log2(df)
+
+#plot result
+kznfsComplexHeatmap(log2df, fileName = "figures/kznfs_heatmap.pdf")
+```
+
+
+Second part is to visualize transposable elements
+Load differentially expressed TEs files and select DE TEs in a list `te_list`
+```{r}
+# select de genes in human vs. chimpanzee
+hmchimpTEres <- read.csv("results/hmchimp/teDESeq2results.csv")
+
+hmchimpTEres_de <- hmchimpTEres %>% 
+    filter(padj < 0.05) %>%
+    filter(abs(log2FoldChange) > 1.2)
+hmchimpTEres_de_list <- rownames(hmchimpTEres_de)
+
+# select de genes in human vs. orangutans
+hmoranTEres <- read.csv("results/hmoran/teDESeq2results.csv")
+hmoranTEres_de <- hmoranTEres %>%
+    filter(padj < 0.05) %>%
+    filter(abs(log2FoldChange) > 1.2)
+hmoranTEres_de_list <- rownames(hmoranTEres_de)
+
+# combined data
+te_list <- intersect(hmchimpTEres_de_list, hmoranTEres_de_list)
+```
+
+Load expression data and visualize the top differentially 50 TEs based on variances 
+```{r}
+hmchimpTE <- read.csv("results/hmchimp/teDESeq2norm.csv")
+hmoranTE <- read.csv("results/hmoran/teDESeq2norm.csv")
+
+dfTE <- merge(hmchimpTE, hmoranTE[,c(4,5,6)], by = "row.names", all = FALSE)
+rownames(dfTE) <- dfTE$Row.names
+dfTE <- dfTE[,-1]
+
+dfTE <- dfTE[rownames(dfTE) %in% te_list,]
+colnames(dfTE) <- c("H1", "H2", "H3", "C1", "C2", "C3", "O1", "O2", "O3")
+
+teComplexHeatmap(as.matrix(log2(dfTE)), fileName = "figures/TotalbCellsDETEHeatmap.pdf", top=50)
+
+```
+
+Next, we visualize and classified TEs based on class levels to have a better 
+resolution in each family.
+```{r}
+data(hg19rmsk_info)
+
+hg19rmsk_de <- hg19rmsk_info[hg19rmsk_info$gene_id %in% te_list, ]
+
+```
+
+Create transposable elements class lists to filter data. Here we separate to 
+LTR and non-LTR because LTR has 56 rows and the others are total 39 rows
+```{r}
+hg19_LTR_de <- hg19rmsk_de[hg19rmsk_de$class_id == "LTR", ] #56
+hg19_non_LTR_de <- hg19rmsk_de[hg19rmsk_de$class_id != "LTR", ] #39
+
+```
+
+
+Normalized expression data with log2(x+1), and visualize differentailly 
+expressed LTR, non-LTR TEs.
+```{r}
+dfTElog2 <- as.matrix(log2(dfTE + 1))
+
+teComplexHeatmap(
+    dfTElog2,
+    teFilter = hg19_non_LTR_de$gene_id,
+    teAnnot = hg19_non_LTR_de,
+    fileName = "figures/deTEsnonLTR.pdf"
+)
+```
+```{r}
+teComplexHeatmap(
+    dfTElog2,
+    teFilter = hg19_LTR_de$gene_id,
+    top = 56,
+    teAnnot = hg19_LTR_de[,c(1,2)],
+    fileName = "figures/deTEsLTR.pdf"
+)
+```
+

@@ -1,0 +1,59 @@
+# KRAB-ZNFs-TEs pairs
+
+```{r}
+library(twice)
+data("hg19rmsk_info")
+teInfo <- hg19rmsk_info
+```
+
+
+```{r}
+# human vs. chimpanzee
+# human
+dfhm <- read.csv("hmchimp_results/hmCorrResult.csv")
+
+kznfsTEsPairs(
+    dfhm, 
+    teInfo, 
+    title="Human KRAB-ZNFs & TEs pairs (Hm vs. Chimp)",
+    fileName="hmchimp_results/hmKZNFsTEsPairs.html"
+)
+
+#chimpanzee
+dfchimp <- read.csv("hmchimp_results/chimpCorrResult.csv")
+
+kznfsTEsPairs(
+    dfchimp,
+    teInfo,
+    title="Chimpanzee KRAB-ZNFs & TEs pairs (Hm vs. Chimp)",
+    fileName="hmchimp_results/chimpKZNFsTEsPairs.html"
+)
+
+```
+
+
+
+
+```{r}
+# human vs. orangutan
+# human
+dfhm <- read.csv("hmoran_results/hmCorrResult.csv")
+
+kznfsTEsPairs(
+    dfhm,
+    teInfo,
+    title="Human KRAB-ZNFs & TEs pairs (Hm vs. Orangutan)",
+    fileName="hmoran_results/hmKZNFsTEsPairs.html"
+)
+
+# orangutan
+dforan <- read.csv("hmoran_results/oranCorrResult.csv")
+kznfsTEsPairs(
+    dforan,
+    teInfo,
+    title="Orangutan KRAB-ZNFs & TEs pairs (Hm vs. Orangutan)",
+    fileName="hmoran_results/oranKZNFsTEsPairs.html"
+)
+
+```
+

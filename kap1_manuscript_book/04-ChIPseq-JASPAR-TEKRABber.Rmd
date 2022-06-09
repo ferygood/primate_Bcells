@@ -1,0 +1,141 @@
+# ChIP-seq-JASPAR-TEKRABber
+
+### Data Information
+The input tables are corrdinates information of KRAB-ZNFs and TEs based on 
+different method. Two of them are matrices built using **JASPAR Core 
+nonredundant vertebrates-2020 collection**, **Zinc finger motifs for human in 
+the JASPAR Collection Unvalidated** and **collection of motifs assembled by 
+Dogan et al**. Upon these four data are intersect by RNA-seq data result which 
+include significantly correlated KRAB-ZNFs and TEs from TEKRABber's result.  
+  
+**This part we will not generate the book at the moment. We wait for Ana's result**
+
+```{r load data, eval=FALSE}
+load("intersect/db_tight.rda") # database x TEKRABber tight
+load("intersect/db_ext.rda") # database x TEKRABber -/+ 100bp
+load("intersect/katja_tight.rda") # ChIP-seq x TEKRABber tight
+load("intersect/katja_ext.rda") # ChIP-seq x TEKRABber -/+ 100bp
+
+hm_db <- df_db_tight_split$hm
+chimp_db <- df_db_tight_split$chimp
+oran_db <- df_db_tight_split$oran
+hm_db_ext <- df_db_ext_split$hm
+chimp_db_ext <- df_db_ext_split$chimp
+oran_db_ext <- df_db_ext_split$oran
+
+hm_kat <- kat_tight_split$hm
+chimp_kat <- kat_tight_split$chimp
+oran_kat <- kat_tight_split$oran
+hm_kat_ext <- kat_ext_split$hm
+chimp_kat_ext <- kat_ext_split$chimp
+oran_kat_ext <- kat_ext_split$oran
+
+
+```
+
+Q1: How many ZNFs and TEs found in the intersect data?
+```{r, eval=FALSE}
+printCount <- function(df){
+    znfcount <- length(unique(df$ZNF_ms))
+    tecount <- length(unique(df$te_name))
+    paste0("unique znf/te count: ", znfcount, " & ", tecount)
+}
+
+dbList <- list(
+    hm_db, hm_db_ext,
+    chimp_db, chimp_db_ext,
+    oran_db, oran_db_ext
+)
+
+print(lapply(dbList, printCount))
+
+katjaList <- list(
+    hm_kat, hm_kat_ext,
+    chimp_kat, chimp_kat_ext,
+    oran_kat, oran_kat_ext
+) 
+
+print(lapply(katjaList, printCount))
+```
+
+A1: from the results aboved, we can know the KZNFs and TEs found from exact and 
+extend location are the same. 
+
+
+Q2: we want to count the repeat ZNFs motifs & TE pairs in our data. Then we can
+see the visualization of the heatmaps/bipartite plots.
+```{r, eval=FALSE}
+library(data.table)
+
+# count how many same znf motifs and te names
+countRepeat <- function(df, name) {
+    df_count <- setDT(df[, c(1,2,3)])[, list(Count=.N), names(df[, c(1,2,3)])]
+    path <- file.path("intersect", name)
+    write.table(df_count, path, sep=",")
+    df_count
+}
+
+countRepeat(hm_db, "hm_db_repeat.csv")
+countRepeat(chimp_db, "chimp_db_repeat.csv")
+countRepeat(oran_db, "oran_db_repeat.csv")
+countRepeat(hm_kat, "hm_kat_repeat.csv")
+countRepeat(chimp_kat, "chimp_kat_repeat.csv")
+countRepeat(oran_kat, "oran_kat_repeat.csv")
+
+```
+
+
+
+```{r, eval=FALSE}
+library(ggplot2)
+library(heatmaply)
+library(reshape2)
+
+pair_heatmap <- function(df, top=40, chr=NULL, lowCol="#d2e1b1", highCol="#bf8924"){
+    
+    if(!is.null(chr)){
+        # filter chromosome
+        df <- df[df$chromosome==chr, ]
+    }
+    
+    df <- df[order(df$Count, decreasing=TRUE), ][seq_len(top), ] # select top genes
+    df <- df[, c("ZNF_ms", "te_name", "Count")]
+    dft <- dcast(df, te_name~ZNF_ms, value.var="Count", sum)
+    rownames(dft) <- dft$te_name
+    dft <- dft[-1]
+    dft[is.na(dft)] <- 0
+    
+    #figPath <- file.path(figDir, figName)
+    
+    heatmaply(as.matrix(dft), 
+              colors = c(low=lowCol, high=highCol),
+              xlab="KRAB-ZNFs",
+              ylab="TEs",
+              width=1000,
+              height=1000
+    )
+
+}
+# test <- countRepeat(hm_db, "hm_db_repeat.csv")
+# #test <- test[test$chromosome=="chr19",]
+# test_select <- test[order(test$Count, decreasing = TRUE),][c(1:40),]
+# test_select <- test_select[,c(1,3,4)]
+# test2 <- dcast(test_select, te_name~ZNF_ms, value.var = 'Count', sum) #reshape2::dcast
+# rownames(test2) <- test2$te_name
+# test2 <- test2[-1]
+# test2[is.na(test2)] <- 0
+# heatmaply(as.matrix(test2), colors = c(low="#d2e1b1", high="#bf8924"))
+
+```
+
+
+```{r, eval=FALSE}
+hmTable <- countRepeat(hm_db, "hm_db_repeat.csv")
+pair_heatmap(hmTable, chr="chr19")
+```
+
+
+```{r, eval=FALSE}
+hmTableKat <- countRepeat(hm_kat, "hm_kat_repeat.csv")
+pair_heatmap(hmTableKat, chr="chr19")
+```

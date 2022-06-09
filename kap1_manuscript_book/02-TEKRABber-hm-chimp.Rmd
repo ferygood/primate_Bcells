@@ -1,0 +1,112 @@
+# TEKRABber analysis human and chimpanzee  
+In this chapter, we will run all TEKRABber analysis, comparing **human and chimpanzee**, including normalizing the data, differentially expressed analysis and 
+correlation analysis. The R script file name of this chapter is `02-TEKRABber-hm-chimp.Rmd`.
+
+```{r load package}
+library(TEKRABber)
+library(tidyverse)
+library(twice)
+```
+
+We first import the gene count and TE count table of human and chimpanzee which 
+we combined previously. Then use their mean expression value with orthology 
+information from Ensembl biomart.
+```{r import data and calculating scaling factor}
+# load data
+hmGene <- read.csv("data/counts/hm_gene.csv")
+hmTE <- read.csv("data/counts/hm_te.csv")
+hmTE <- hmTE[,c(1,4,5,6)]
+chimpGene <- read.csv("data/counts/chimp_gene.csv")
+chimpTE <- read.csv("data/counts/chimp_te.csv")
+chimpTE <- chimpTE[,c(1,4,5,6)]
+
+fetchData <- orthologScale(
+  geneCountRef = hmGene,
+  geneCountCompare = chimpGene,
+  speciesRef = 'hsapiens',
+  speciesCompare = 'ptroglodytes'
+)
+```
+
+Then we use `DECorrInputs` function to create input tables for running DE analysis and 
+correlation analysis.
+```{r create input tables}
+inputBundle <- DECorrInputs(
+  orthologTable = fetchData$orthologTable,
+  scaleFactor = fetchData$scaleFactor,
+  geneCountRef = hmGene,
+  geneCountCompare = chimpGene,
+  teCountRef = hmTE,
+  teCountCompare = chimpTE
+)
+```
+
+To run DE analysis, we need to create a metadata for it (similar to the preparation of DESeq2). The function for this step is `DEgeneTE`.
+```{r DE analysis}
+meta <- data.frame(
+  species = c(rep("human", ncol(hmGene)-1), 
+              rep("chimpanzee", ncol(chimpGene)-1))
+)
+
+meta$species <- factor(meta$species, levels = c("human", "chimpanzee"))
+rownames(meta) <- colnames(inputBundle$geneInputDESeq2)
+hmchimpDE <- DEgeneTE(
+  geneTable = inputBundle$geneInputDESeq2,
+  teTable = inputBundle$teInputDESeq2,
+  metadata = meta,
+  expDesign = TRUE,
+  fileDir = "results/hmchimp"
+)
+
+```
+
+In this step, we calculate the correlation between selected KRAB-ZNFs with TEs.
+We first load KRAB-ZNFs information and filter them from all genes. Then we load 
+input data from previous input Bundle, here we also want to see the effect of 
+KAP1 (ENSG00000130726), so we include it from all gene.
+```{r correlation analysis}
+# load kznfs 
+data(hmKZNFs337)
+hm337 <- hmKZNFs337
+ensembl_id <- c(hm337$ensembl_gene_id, "ENSG00000130726") # ENSG00000130726 = KAP1, TRIM28
+
+# load ortholog data
+hmGeneCorrInput <- inputBundle$geneCorrInputRef
+hmGeneCorrInput <- hmGeneCorrInput[rownames(hmGeneCorrInput) %in% ensembl_id,]
+chimpGeneCorrInput <- inputBundle$geneCorrInputCompare
+chimpGeneCorrInput <- chimpGeneCorrInput[rownames(chimpGeneCorrInput) %in% ensembl_id,]
+
+# filter gene name and add KAP1
+gene.name <- hm337[hm337$ensembl_gene_id %in% rownames(hmGeneCorrInput),]
+gene.name <- rbind(gene.name, c("ENSG00000130726", "TRIM28"))
+
+# replace rownames from ensembl_id to gene name
+rownames(hmGeneCorrInput) <- gene.name$external_gene_name[match(rownames(hmGeneCorrInput), gene.name$ensembl_gene_id)]
+
+rownames(chimpGeneCorrInput) <- gene.name$external_gene_name[
+  match(rownames(chimpGeneCorrInput), gene.name$ensembl_gene_id)
+]
+
+# load TE data
+hmTECorrInput <- inputBundle$TECorrInputRef
+chimpTECorrInput <- inputBundle$TECorrInputCompare
+
+# run correlation
+hmCorrResult <- corrOrthologTE(
+    geneInput = hmGeneCorrInput,
+    teInput = hmTECorrInput,
+    corrMethod = "pearson",
+    padjMethod = "fdr",
+    fileDir = "results/hmchimp",
+    fileName = "hmCorrResult.csv"
+)
+chimpCorrResult <- corrOrthologTE(
+  geneInput = chimpGeneCorrInput,
+  teInput = chimpTECorrInput,
+  corrMethod = "pearson",
+  padjMethod = "fdr",
+  fileDir = "results/hmchimp",
+  fileName = "chimpCorrResult.csv"
+)
+
+```

@@ -1,0 +1,90 @@
+# TEKRABber CoDiNA
+
+```{r load package}
+library(CoDiNA)
+library(tidyverse)
+```
+
+```{r fxns}
+# this function filter the gene/te list for filtering DiffNet object
+corrFilterList <- function(df, padjValue=0.05) {
+    
+    # filter the list of gene name and TEs
+    df <- filter(df, padj < padjValue)
+    gene <- unique(df$geneName)
+    te <- unique(df$teName)
+
+    filterList <- list("gene"=gene, "te"=te)
+    filterList
+}
+
+
+# select significant nodes-nodes
+selectNodes <- function(DiffNet, filterList) {
+    
+    
+}
+
+```
+
+
+```{r TEKRABber hmchimp result}
+hmCorr <- read.csv("hmchimp_results/hmCorrResult.csv")
+chimpCorr <- read.csv("hmchimp_results/chimpCorrResult.csv")
+
+# prepare input for CoDiNA
+hmCorrInput <- hmCorr[,c("geneName", "teName", "padj")]
+chimpCorrInput <- chimpCorr[,c("geneName", "teName", "padj")]
+
+# filter list
+hmCorrFilterList <- corrFilterList(hmCorr)
+
+```
+
+```{r CoDiNA hmchimp result}
+hmchimpDiffNet = MakeDiffNet(Data = list(hmCorrInput, chimpCorrInput), 
+                      Code = c('Human', 'Chimpanzee'))
+
+# select links that match both KRAB-ZNFs and TEs
+hmchimpDiffNetFilter <- hmchimpDiffNet[
+    hmchimpDiffNet$Node.1 %in% hmCorrFilterList$te & 
+        hmchimpDiffNet$Node.2 %in% hmCorrFilterList$gene, ]
+
+hmchimpDiffNetFilterPhi <- hmchimpDiffNetFilter %>% filter(Phi!="a")
+
+
+hmchimpGraph = plot(x = hmchimpDiffNetFilterPhi, cutoff.ratio = -1,
+             layout = NULL, smooth.edges = TRUE,
+             path = NULL, MakeGroups = FALSE, Cluster = FALSE,
+             legend = TRUE, manipulation = FALSE, sort.by.Phi = FALSE)
+```
+
+```{r convert to igraph and labeling the color}
+library(igraph)
+i.hmchimpGraph <- as.igraph(hmchimpGraph)
+g <- i.hmchimpGraph
+
+V(g)$type <- bipartite_mapping(g)$type
+V(g)$color <- ifelse(V(g)$type, "lightgreen", "salmon")
+E(g)$color <- "black"
+plot(g, vertex.label.cex=0.8, vertex.label.color="black")
+
+g <- graph.data.frame(df_select[,c("ZNF_ms", "te_name")], directed = FALSE)
+    V(g)$type <- bipartite_mapping(g)$type
+    
+    V(g)$color <- ifelse(V(g)$type, "lightgreen", "salmon")
+    V(g)$shape <- ifelse(V(g)$type, "circle", "square")
+    E(g)$color <- "lightgray"
+    
+    if (!is.null(filename)) {
+        pdf(filename, 10,10)
+        igraph.options(plot.layout=layout.graphopt, vertex.size=13)
+        plot(g, vertex.label.cex = 0.8, vertex.label.color="black")
+    }
+
+    plot(g, vertex.label.cex = 0.8, vertex.label.color="black")
+
+
+```
+
+

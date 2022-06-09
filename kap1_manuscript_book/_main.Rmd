@@ -1,0 +1,2342 @@
+--- 
+title: "KAP1-KRAB-ZNFs manuscript"
+author: "Yao-Chung"
+date: "`r Sys.Date()`"
+site: bookdown::bookdown_site
+documentclass: book
+bibliography: [book.bib, packages.bib]
+# url: your book url like https://bookdown.org/yihui/bookdown
+# cover-image: path to the social sharing image like images/cover.jpg
+description: |
+  This is a book containg the analysis done by Yao-Chung for KAP1-KRAB-ZNFs 
+  manuscript.
+link-citations: yes
+#github-repo: rstudio/bookdown-demo
+---
+# Introduction
+Here you can review the analysis of KRAB-ZNFs-TEs from RNA-seq data from human,
+chimpanzee, and orangutan B cells.
+
+
+
+```{r include=FALSE}
+# automatically create a bib database for R packages
+knitr::write_bib(c(
+  .packages(), 'bookdown', 'knitr', 'rmarkdown'
+), 'packages.bib')
+```
+
+<!--chapter:end:index.Rmd-->
+
+# Data preparation
+
+```{r}
+library(tidyverse)
+```
+
+## 1 Combined human data and create gene table
+```{r create human gene table}
+# load data
+gm18558 <- read_table("data/genecount/GM18558_Zeb2_neg.featureCounts.jcounts")
+gm18960 <- read_table("data/genecount/GM18960_Zeb2_neg.featureCounts.jcounts")
+gm19240 <- read_table("data/genecount/GM19240_Zeb2_neg.featureCounts.jcounts")
+
+# remove gene name is NA, and select gene count
+gm18558 <- drop_na(gm18558[,c(1,9)])
+gm18960 <- drop_na(gm18960[,c(1,9)])
+gm19240 <- drop_na(gm19240[,c(1,9)])
+
+# merge and count mean
+gm18558 <- aggregate(gm18558[,2], list(gm18558$PrimaryGene), mean)
+gm18960 <- aggregate(gm18960[,2], list(gm18960$PrimaryGene), mean)
+gm19240 <- aggregate(gm19240[,2], list(gm19240$PrimaryGene), mean)
+
+hm.gene <- inner_join(gm18558, gm18960, by="Group.1")
+hm.gene <- inner_join(hm.gene, gm19240, by = "Group.1")
+colnames(hm.gene) <- c("gene", "GM18558", "GM18960", "GM19240")
+hm.gene <- hm.gene %>%
+  mutate(
+    GM18558 = round(GM18558), 
+    GM18960 = round(GM18960), 
+    GM19240 = round(GM19240)
+  )
+
+write.table(hm.gene, "data/counts/hm_gene.csv", sep=",")
+```
+
+## 2 combined chimpanzee data and create gene table
+```{r create chimpanzee table}
+# load data
+judith <- read_table("data/genecount/Chimp_Judith_Zeb2_neg.featureCounts.jcounts")
+leo <- read_table("data/genecount/Chimp_Leo_Zeb2_neg.featureCounts.jcounts")
+maryke <- read_table("data/genecount/Chimp_Maryke_Zeb2_neg.featureCounts.jcounts")
+
+# remove NA and select gene count
+judith <- drop_na(judith[,c(1,9)])
+leo <- drop_na(leo[,c(1,9)])
+maryke <- drop_na(maryke[,c(1,9)])
+
+# merge and count mean
+judith <- aggregate(judith[, 2], list(judith$PrimaryGene), mean)
+leo <- aggregate(leo[,2], list(leo$PrimaryGene), mean)
+maryke <- aggregate(maryke[,2], list(maryke$PrimaryGene), mean)
+
+chimp.gene <- inner_join(judith, leo, by="Group.1")
+chimp.gene <- inner_join(chimp.gene, maryke, by="Group.1")
+colnames(chimp.gene) <- c("gene", "Judith", "Leo", "Maryke")
+
+chimp.gene <- chimp.gene %>%
+  mutate(Judith = round(Judith), Leo = round(Leo), Maryke = round(Maryke)) %>%
+  mutate(gene = substr(gene, 1, 18)) # remove decimal ensembl id
+
+write.table(chimp.gene, "data/counts/chimp_gene.csv", sep=",")
+```
+
+## 3 combined orangutans data and create gene table
+```{r}
+guchi <- read_table("data/genecount/Orang_Guchi_Zeb2_neg.featureCounts.jcounts")
+jaqo <- read_table("data/genecount/Orang_Jaqo_Zeb2_neg.featureCounts.jcounts")
+jingjing <- read_table("data/genecount/Orang_JingJing_Zeb2_neg.featureCounts.jcounts")
+
+# remove NA and select gene count
+guchi <- drop_na(guchi[,c(1,9)])
+jaqo <- drop_na(jaqo[,c(1,9)])
+jingjing <- drop_na(jingjing[,c(1,9)])
+
+# merge and count mean
+guchi <- aggregate(guchi[,2], list(guchi$PrimaryGene), mean)
+jaqo <- aggregate(jaqo[,2], list(jaqo$PrimaryGene), mean)
+jingjing <- aggregate(jingjing[,2], list(jingjing$PrimaryGene), mean)
+
+oran.gene <- inner_join(guchi, jaqo, by="Group.1")
+oran.gene <- inner_join(oran.gene, jingjing, by="Group.1")
+colnames(oran.gene) <- c("gene", "Guchi", "Jaqo", "Jingjing")
+
+oran.gene <- oran.gene %>%
+  mutate(
+    Guchi = round(Guchi),
+    Jaqo = round(Jaqo),
+    Jingjing = round(Jingjing),
+    gene = substr(gene, 1, 18)
+  )
+
+write.table(oran.gene, file = "data/counts/oran_gene.csv", sep=",")
+
+```
+
+## 4. Human TE data
+```{r}
+h1 <- read_table("data/tecount/GM18558_Zeb2_neg.cntTable")
+h2 <- read_table("data/tecount/GM18960_Zeb2_neg.cntTable")
+h3 <- read_table("data/tecount/GM19240_Zeb2_neg.cntTable")
+
+h1 <- h1[!grepl("ENSG", h1$`gene/TE`),]
+h2 <- h2[!grepl("ENSG", h2$`gene/TE`),]
+h3 <- h3[!grepl("ENSG", h3$`gene/TE`),]
+
+h1 <- h1 %>% separate(
+  `gene/TE`,
+  c("name", "family", "class"),
+  sep = ":"
+)
+colnames(h1)[4] <-"GM18558" 
+
+colnames(h2)[2] <- "GM18960"
+colnames(h3)[2] <- "GM19240"
+
+hm.te <- cbind(h1, h2[,2], h3[,2])
+write.table(hm.te, "data/counts/hm_te.csv", sep=",")
+```
+
+## 5. Chimpanzee TE data
+```{r}
+c1 <- read_table("data/tecount/Chimp_Judith_Zeb2_neg.cntTable")
+c2 <- read_table("data/tecount/Chimp_Leo_Zeb2_neg.cntTable")
+c3 <- read_table("data/tecount/Chimp_Maryke_Zeb2_neg.cntTable")
+
+c1 <- c1[!grepl("ENS", c1$`gene/TE`),]
+c2 <- c2[!grepl("ENS", c2$`gene/TE`),]
+c3 <- c3[!grepl("ENS", c3$`gene/TE`),]
+
+c1 <- c1 %>% separate(
+  `gene/TE`,
+  c("name", "family", "class"),
+  sep = ":"
+)
+colnames(c1)[4] <-"Judith" 
+colnames(c2)[2] <- "Leo"
+colnames(c3)[2] <- "Maryke"
+
+chimp.te <- cbind(c1, c2[,2], c3[,2])
+chimp.te <- chimp.te[-1,]
+rownames(chimp.te) <- 1:1260
+write.table(chimp.te, "data/counts/chimp_te.csv", sep=",")
+```
+
+
+## 6. Orangutan TE data
+```{r}
+o1 <- read_table("data/tecount/Orang_Guchi_Zeb2_neg.cntTable")
+o2 <- read_table("data/tecount/Orang_Jaqo_Zeb2_neg.cntTable")
+o3 <- read_table("data/tecount/Orang_JingJing_Zeb2_neg.cntTable")
+
+o1 <- o1[!grepl("ENS", o1$`gene/TE`),]
+o2 <- o2[!grepl("ENS", o2$`gene/TE`),]
+o3 <- o3[!grepl("ENS", o3$`gene/TE`),]
+
+o1 <- o1 %>% separate(
+  `gene/TE`,
+  c("name", "family", "class"),
+  sep = ":"
+)
+colnames(o1)[4] <-"Guchi" 
+colnames(o2)[2] <- "Jaqo"
+colnames(o3)[2] <- "Jingjing"
+
+oran.te <- cbind(o1, o2[,2], o3[,2])
+write.table(oran.te, "data/counts/oran_te.csv", sep=",")
+```
+
+
+<!--chapter:end:01-data-preparation.Rmd-->
+
+# TEKRABber analysis human and chimpanzee
+
+```{r}
+library(TEKRABber)
+library(tidyverse)
+```
+
+### 1 download ortholog information
+```{r}
+# load data
+hmGene <- read.csv("counts/hm_gene.csv")
+hmTE <- read.csv("counts/hm_te.csv")
+hmTE <- hmTE[,c(1,4,5,6)]
+chimpGene <- read.csv("counts/chimp_gene.csv")
+chimpTE <- read.csv("counts/chimp_te.csv")
+chimpTE <- chimpTE[,c(1,4,5,6)]
+
+fetchData <- orthologScale(
+  geneCountRef = hmGene,
+  geneCountCompare = chimpGene,
+  speciesRef = 'hsapiens',
+  speciesCompare = 'ptroglodytes'
+)
+```
+
+### 2 create input dataframes for DE expressed analysis and correlation estimation
+```{r}
+inputBundle <- DECorrInputs(
+  orthologTable = fetchData$orthologTable,
+  scaleFactor = fetchData$scaleFactor,
+  geneCountRef = hmGene,
+  geneCountCompare = chimpGene,
+  teCountRef = hmTE,
+  teCountCompare = chimpTE
+)
+```
+### 3 DE analysis
+```{r}
+meta <- data.frame(
+  species = c(rep("human", ncol(hmGene)-1), 
+              rep("chimpanzee", ncol(chimpGene)-1))
+)
+
+meta$species <- factor(meta$species, levels = c("human", "chimpanzee"))
+rownames(meta) <- colnames(inputBundle$geneInputDESeq2)
+hmchimpDE <- DEgeneTE(
+  geneTable = inputBundle$geneInputDESeq2,
+  teTable = inputBundle$teInputDESeq2,
+  metadata = meta,
+  contrastVector = c("species", "human", "chimpanzee"),
+  expDesign = TRUE
+)
+
+```
+### Correlation analysis
+We need to filter KRAB-ZNFs from gene list
+```{r}
+# load kznfs 
+hm337 <- read.csv("counts/human337KZNFs.csv")
+ensembl_id <- c(hm337$ensembl_gene_id, "ENSG00000130726") # ENSG00000130726 = KAP1, TRIM28
+
+# load ortholog data
+hmGeneCorrInput <- inputBundle$geneCorrInputRef
+hmGeneCorrInput <- hmGeneCorrInput[rownames(hmGeneCorrInput) %in% ensembl_id,]
+chimpGeneCorrInput <- inputBundle$geneCorrInputCompare
+chimpGeneCorrInput <- chimpGeneCorrInput[rownames(chimpGeneCorrInput) %in% ensembl_id,]
+
+# filter gene name and add KAP1
+gene.name <- hm337[hm337$ensembl_gene_id %in% rownames(hmGeneCorrInput),]
+gene.name <- rbind(gene.name, c("ENSG00000130726", "TRIM28"))
+
+# replace rownames from ensembl_id to gene name
+rownames(hmGeneCorrInput) <- gene.name$external_gene_name[match(rownames(hmGeneCorrInput), gene.name$ensembl_gene_id)]
+
+rownames(chimpGeneCorrInput) <- gene.name$external_gene_name[
+  match(rownames(chimpGeneCorrInput), gene.name$ensembl_gene_id)
+]
+
+# load TE data
+hmTECorrInput <- inputBundle$TECorrInputRef
+chimpTECorrInput <- inputBundle$TECorrInputCompare
+
+# run correlation
+hmCorrResult <- corrOrthologTE(
+    geneInput = hmGeneCorrInput,
+    teInput = hmTECorrInput,
+    corrMethod = "pearson",
+    padjMethod = "fdr",
+    filename = "hmCorrResult.csv"
+)
+chimpCorrResult <- corrOrthologTE(
+  geneInput = chimpGeneCorrInput,
+  teInput = chimpTECorrInput,
+  corrMethod = "pearson",
+  padjMethod = "fdr",
+  filename = "chimpCorrResult.csv"
+)
+
+
+```
+
+Interpret results
+
+```{r}
+hmCorrResult <- read.csv("hmchimp_results/hmCorrResult.csv")
+
+hmCorrResult.sig <- hmCorrResult %>% 
+  filter(padj < 0.05)
+
+length(unique(hmCorrResult.sig$geneName))
+length(unique(hmCorrResult.sig$teName))
+
+hmCorrResult.sig.positive <- hmCorrResult.sig %>%
+  filter(coef > 0) 
+
+hmCorrResult.sig.negative <- hmCorrResult.sig %>%
+  filter(coef < 0)
+
+```
+
+
+
+```{r}
+chimpCorrResult <- read.csv("hmchimp_results/chimpCorrResult.csv")
+chimpCorrResult.sig <- chimpCorrResult %>%
+  filter(padj < 0.05)
+
+length(unique(chimpCorrResult.sig$geneName))
+length(unique(chimpCorrResult.sig$teName))
+```
+
+
+<!--chapter:end:02-TEKRABber-hm-chimp.Rmd-->
+
+# TEKRABber human and orangutan
+
+```{r}
+library(TEKRABber)
+library(tidyverse)
+```
+
+### 1 download ortholog information
+```{r}
+# load data
+hmGene <- read.csv("counts/hm_gene.csv")
+hmTE <- read.csv("counts/hm_te.csv")
+hmTE <- hmTE[,c(1,4,5,6)]
+oranGene <- read.csv("counts/oran_gene.csv")
+oranTE <- read.csv("counts/oran_te.csv")
+oranTE <- oranTE[,c(1,4,5,6)]
+
+fetchData <- orthologScale(
+  geneCountRef = hmGene,
+  geneCountCompare = oranGene,
+  speciesRef = 'hsapiens',
+  speciesCompare = 'pabelii'
+)
+```
+
+### 2 create input dataframes for DE expressed analysis and correlation estimation
+```{r}
+inputBundle <- DECorrInputs(
+  orthologTable = fetchData$orthologTable,
+  scaleFactor = fetchData$scaleFactor,
+  geneCountRef = hmGene,
+  geneCountCompare = oranGene,
+  teCountRef = hmTE,
+  teCountCompare = oranTE
+)
+```
+### 3 DE analysis
+```{r}
+meta <- data.frame(
+  species = c(rep("human", ncol(hmGene)-1), 
+              rep("orangutans", ncol(oranGene)-1))
+)
+
+meta$species <- factor(meta$species, levels = c("human", "orangutans"))
+rownames(meta) <- colnames(inputBundle$geneInputDESeq2)
+hmoranDE <- DEgeneTE(
+  geneTable = inputBundle$geneInputDESeq2,
+  teTable = inputBundle$teInputDESeq2,
+  metadata = meta,
+  contrastVector = c("species", "human", "orangutans"),
+  expDesign = TRUE
+)
+
+```
+### Correlation analysis
+We need to filter KRAB-ZNFs from gene list
+for viewing the result from appTEKRABber, you need to use Ensembl ID instead of gene name.
+```{r}
+# load kznfs 
+hm337 <- read.csv("counts/human337KZNFs.csv")
+ensembl_id <- c(hm337$ensembl_gene_id, "ENSG00000130726") # ENSG00000130726 = KAP1, TRIM28
+
+# load ortholog data
+hmGeneCorrInput <- inputBundle$geneCorrInputRef
+hmGeneCorrInput <- hmGeneCorrInput[rownames(hmGeneCorrInput) %in% ensembl_id,]
+oranGeneCorrInput <- inputBundle$geneCorrInputCompare
+oranGeneCorrInput <- oranGeneCorrInput[rownames(oranGeneCorrInput) %in% ensembl_id,]
+
+# filter gene name and add KAP1
+gene.name <- hm337[hm337$ensembl_gene_id %in% rownames(hmGeneCorrInput),]
+gene.name <- rbind(gene.name, c("ENSG00000130726", "TRIM28"))
+
+#replace rownames from ensembl_id to gene name
+rownames(hmGeneCorrInput) <- gene.name$external_gene_name[match(rownames(hmGeneCorrInput), gene.name$ensembl_gene_id)]
+
+rownames(oranGeneCorrInput) <- gene.name$external_gene_name[
+  match(rownames(oranGeneCorrInput), gene.name$ensembl_gene_id)
+]
+
+# load TE data
+hmTECorrInput <- inputBundle$TECorrInputRef
+oranTECorrInput <- inputBundle$TECorrInputCompare
+
+# run correlation
+hmCorrResult <- corrOrthologTE(
+    geneInput = hmGeneCorrInput,
+    teInput = hmTECorrInput,
+    corrMethod = "pearson",
+    padjMethod = "fdr",
+    fileDir = "hmoran_results",
+    fileName = "hmCorrResult.csv"
+)
+oranCorrResult <- corrOrthologTE(
+  geneInput = oranGeneCorrInput,
+  teInput = oranTECorrInput,
+  corrMethod = "pearson",
+  padjMethod = "fdr",
+  fileDir = "hmoran_results",
+  fileName = "oranCorrResult.csv"
+)
+
+
+```
+
+```{r, eval=FALSE}
+appTEKRABber(
+  DEresult = hmoranDE,
+  corrRef = hmCorrResult,
+  corrCompare = oranCorrResult,
+  metadata = meta
+)
+```
+
+Interpret results
+
+```{r}
+#human
+hmCorrResult <- read.csv("hmoran_results//hmCorrResult.csv")
+hmCorrResult.sig <- hmCorrResult %>% 
+  filter(padj < 0.05)
+
+length(unique(hmCorrResult.sig$geneName))
+length(unique(hmCorrResult.sig$teName))
+
+```
+```{r}
+# oran
+oranCorrResult <- read.csv("hmoran_results/oranCorrResult.csv")
+oranCorrResult.sig <- oranCorrResult %>%
+  filter(padj < 0.05)
+
+length(unique(oranCorrResult.sig$geneName))
+length(unique(oranCorrResult.sig$teName))
+```
+
+
+<!--chapter:end:03-TEKRABber-hm-oran.Rmd-->
+
+# ChIP-seq-JASPAR-TEKRABber
+
+### Data Information
+The input tables are corrdinates information of KRAB-ZNFs and TEs based on 
+different method. Two of them are matrices built using **JASPAR Core 
+nonredundant vertebrates-2020 collection**, **Zinc finger motifs for human in 
+the JASPAR Collection Unvalidated** and **collection of motifs assembled by 
+Dogan et al**. Upon these four data are intersect by RNA-seq data result which 
+include significantly correlated KRAB-ZNFs and TEs from TEKRABber's result.
+
+```{r load data}
+load("intersect/db_tight.rda") # database x TEKRABber tight
+load("intersect/db_ext.rda") # database x TEKRABber -/+ 100bp
+load("intersect/katja_tight.rda") # ChIP-seq x TEKRABber tight
+load("intersect/katja_ext.rda") # ChIP-seq x TEKRABber -/+ 100bp
+
+hm_db <- df_db_tight_split$hm
+chimp_db <- df_db_tight_split$chimp
+oran_db <- df_db_tight_split$oran
+hm_db_ext <- df_db_ext_split$hm
+chimp_db_ext <- df_db_ext_split$chimp
+oran_db_ext <- df_db_ext_split$oran
+
+hm_kat <- kat_tight_split$hm
+chimp_kat <- kat_tight_split$chimp
+oran_kat <- kat_tight_split$oran
+hm_kat_ext <- kat_ext_split$hm
+chimp_kat_ext <- kat_ext_split$chimp
+oran_kat_ext <- kat_ext_split$oran
+
+
+```
+
+Q1: How many ZNFs and TEs found in the intersect data?
+```{r}
+printCount <- function(df){
+    znfcount <- length(unique(df$ZNF_ms))
+    tecount <- length(unique(df$te_name))
+    paste0("unique znf/te count: ", znfcount, " & ", tecount)
+}
+
+dbList <- list(
+    hm_db, hm_db_ext,
+    chimp_db, chimp_db_ext,
+    oran_db, oran_db_ext
+)
+
+print(lapply(dbList, printCount))
+
+katjaList <- list(
+    hm_kat, hm_kat_ext,
+    chimp_kat, chimp_kat_ext,
+    oran_kat, oran_kat_ext
+) 
+
+print(lapply(katjaList, printCount))
+```
+
+A1: from the results aboved, we can know the KZNFs and TEs found from exact and 
+extend location are the same. 
+
+
+Q2: we want to count the repeat ZNFs motifs & TE pairs in our data. Then we can
+see the visualization of the heatmaps/bipartite plots.
+```{r}
+library(data.table)
+
+# count how many same znf motifs and te names
+countRepeat <- function(df, name) {
+    df_count <- setDT(df[, c(1,2,3)])[, list(Count=.N), names(df[, c(1,2,3)])]
+    path <- file.path("intersect", name)
+    write.table(df_count, path, sep=",")
+    df_count
+}
+
+countRepeat(hm_db, "hm_db_repeat.csv")
+countRepeat(chimp_db, "chimp_db_repeat.csv")
+countRepeat(oran_db, "oran_db_repeat.csv")
+countRepeat(hm_kat, "hm_kat_repeat.csv")
+countRepeat(chimp_kat, "chimp_kat_repeat.csv")
+countRepeat(oran_kat, "oran_kat_repeat.csv")
+
+```
+
+
+
+```{r}
+library(ggplot2)
+library(heatmaply)
+library(reshape2)
+
+pair_heatmap <- function(df, top=40, chr=NULL, lowCol="#d2e1b1", highCol="#bf8924"){
+    
+    if(!is.null(chr)){
+        # filter chromosome
+        df <- df[df$chromosome==chr, ]
+    }
+    
+    df <- df[order(df$Count, decreasing=TRUE), ][seq_len(top), ] # select top genes
+    df <- df[, c("ZNF_ms", "te_name", "Count")]
+    dft <- dcast(df, te_name~ZNF_ms, value.var="Count", sum)
+    rownames(dft) <- dft$te_name
+    dft <- dft[-1]
+    dft[is.na(dft)] <- 0
+    
+    #figPath <- file.path(figDir, figName)
+    
+    heatmaply(as.matrix(dft), 
+              colors = c(low=lowCol, high=highCol),
+              xlab="KRAB-ZNFs",
+              ylab="TEs",
+              width=1000,
+              height=1000
+    )
+
+}
+# test <- countRepeat(hm_db, "hm_db_repeat.csv")
+# #test <- test[test$chromosome=="chr19",]
+# test_select <- test[order(test$Count, decreasing = TRUE),][c(1:40),]
+# test_select <- test_select[,c(1,3,4)]
+# test2 <- dcast(test_select, te_name~ZNF_ms, value.var = 'Count', sum) #reshape2::dcast
+# rownames(test2) <- test2$te_name
+# test2 <- test2[-1]
+# test2[is.na(test2)] <- 0
+# heatmaply(as.matrix(test2), colors = c(low="#d2e1b1", high="#bf8924"))
+
+```
+
+
+```{r}
+hmTable <- countRepeat(hm_db, "hm_db_repeat.csv")
+pair_heatmap(hmTable, chr="chr19")
+```
+
+
+```{r}
+hmTableKat <- countRepeat(hm_kat, "hm_kat_repeat.csv")
+pair_heatmap(hmTableKat, chr="chr19")
+```
+
+<!--chapter:end:04-ChIPseq-JASPAR-TEKRABber.Rmd-->
+
+# TEKRABber CoDiNA
+
+```{r load package}
+library(CoDiNA)
+library(tidyverse)
+```
+
+```{r fxns}
+# this function filter the gene/te list for filtering DiffNet object
+corrFilterList <- function(df, padjValue=0.05) {
+    
+    # filter the list of gene name and TEs
+    df <- filter(df, padj < padjValue)
+    gene <- unique(df$geneName)
+    te <- unique(df$teName)
+
+    filterList <- list("gene"=gene, "te"=te)
+    filterList
+}
+
+
+# select significant nodes-nodes
+selectNodes <- function(DiffNet, filterList) {
+    
+    
+}
+
+```
+
+
+```{r TEKRABber hmchimp result}
+hmCorr <- read.csv("hmchimp_results/hmCorrResult.csv")
+chimpCorr <- read.csv("hmchimp_results/chimpCorrResult.csv")
+
+# prepare input for CoDiNA
+hmCorrInput <- hmCorr[,c("geneName", "teName", "padj")]
+chimpCorrInput <- chimpCorr[,c("geneName", "teName", "padj")]
+
+# filter list
+hmCorrFilterList <- corrFilterList(hmCorr)
+
+```
+
+```{r CoDiNA hmchimp result}
+hmchimpDiffNet = MakeDiffNet(Data = list(hmCorrInput, chimpCorrInput), 
+                      Code = c('Human', 'Chimpanzee'))
+
+# select links that match both KRAB-ZNFs and TEs
+hmchimpDiffNetFilter <- hmchimpDiffNet[
+    hmchimpDiffNet$Node.1 %in% hmCorrFilterList$te & 
+        hmchimpDiffNet$Node.2 %in% hmCorrFilterList$gene, ]
+
+hmchimpDiffNetFilterPhi <- hmchimpDiffNetFilter %>% filter(Phi!="a")
+
+
+hmchimpGraph = plot(x = hmchimpDiffNetFilterPhi, cutoff.ratio = -1,
+             layout = NULL, smooth.edges = TRUE,
+             path = NULL, MakeGroups = FALSE, Cluster = FALSE,
+             legend = TRUE, manipulation = FALSE, sort.by.Phi = FALSE)
+```
+
+```{r convert to igraph and labeling the color}
+library(igraph)
+i.hmchimpGraph <- as.igraph(hmchimpGraph)
+g <- i.hmchimpGraph
+
+V(g)$type <- bipartite_mapping(g)$type
+V(g)$color <- ifelse(V(g)$type, "lightgreen", "salmon")
+E(g)$color <- "black"
+plot(g, vertex.label.cex=0.8, vertex.label.color="black")
+
+g <- graph.data.frame(df_select[,c("ZNF_ms", "te_name")], directed = FALSE)
+    V(g)$type <- bipartite_mapping(g)$type
+    
+    V(g)$color <- ifelse(V(g)$type, "lightgreen", "salmon")
+    V(g)$shape <- ifelse(V(g)$type, "circle", "square")
+    E(g)$color <- "lightgray"
+    
+    if (!is.null(filename)) {
+        pdf(filename, 10,10)
+        igraph.options(plot.layout=layout.graphopt, vertex.size=13)
+        plot(g, vertex.label.cex = 0.8, vertex.label.color="black")
+    }
+
+    plot(g, vertex.label.cex = 0.8, vertex.label.color="black")
+
+
+```
+
+
+
+<!--chapter:end:05-TEKRABber-CoDiNA.Rmd-->
+
+# Subset of coordinates
+
+In this file, I will select the coordinates and send them to anna to do the analysis again.
+(1) Subset only the information from hg19 ensGene and rmsk file.
+(2) Subsets the name of gene and TEs from TEKRABber result
+(3) Generate 6 tables for Ana (human (gene, te), chimpanzee (gene, te), oran (gene, te))
+
+```{r load reference file}
+library(dplyr)
+# hg19 gene reference
+hg19gtf <- rtracklayer::import('../hg19.ensGene.gtf')
+hg19ens <- as.data.frame(hg19gtf)
+
+# hg19 TE reference
+hg19rmskgtf <- rtracklayer::import('../hg19_rmsk_TE.gtf')
+hg19rmsk <- Repitools::annoGR2DF(hg19rmskgtf)
+
+# rearrange the data 
+hg19ensTable <- hg19ens[,c("gene_id", "seqnames", "start", "end")]
+hg19rmskTable <- hg19rmsk[, c("gene_id", "chr", "start", "end")]
+
+```
+
+```{r convert ID}
+# convert id to gene name 
+library(gprofiler2)
+geneName <- gconvert(query = unique(hg19ensTable$gene_id), 
+                     organism = "hsapiens",target="ENSG",
+                     mthreshold = Inf, filter_na = TRUE)
+
+hg19ensTableMerge <- merge(geneName[,c("input", "name")], hg19ensTable,
+                           by.x = "input", by.y="gene_id")
+
+```
+
+Then we filter our data, but we write a function and load the data first.
+```{r}
+sigData <- function(df, refTable, filterTE=FALSE) {
+    
+    df <- df %>% 
+            filter(pvalue < 0.05)
+    
+    df.output <- data.frame()
+    
+    if (filterTE==FALSE) {
+        df.output <- refTable[refTable$name %in% df$geneName, ]
+    } else if (filterTE==TRUE) {
+        df.output <- refTable[refTable$gene_id %in% df$teName, ]
+    }  
+    
+    df.output <- df.output[!duplicated(df.output), ]
+    df.output
+}
+
+hmchimpCorr <- read.csv("hmchimp_results/hmCorrResult.csv")
+chimpCorr <- read.csv("hmchimp_results/chimpCorrResult.csv")
+hmoranCorr <- read.csv("hmoran_results/hmCorrResult.csv")
+oranCorr <- read.csv("hmoran_results/hmCorrResult.csv")
+```
+
+
+```{r filter human data}
+hmchimpGene <- sigData(hmchimpCorr, hg19ensTableMerge, filterTE = FALSE)
+hmchimpTE <- sigData(hmchimpCorr, hg19rmskTable, filterTE = TRUE)
+
+hmoranGene <- sigData(hmoranCorr, hg19ensTableMerge, filterTE = FALSE)
+hmoranTE <- sigData(hmoranCorr, hg19rmskTable, filterTE = TRUE)
+
+hmGeneMerge <- full_join(hmchimpGene, hmoranGene)
+hmTEMerge <- full_join(hmchimpTE, hmoranTE)
+```
+```{r filter chimpanzee and orangutan data}
+#chimpanzee
+chimpGene <- sigData(chimpCorr, hg19ensTableMerge, filterTE = FALSE)
+chimpTE <- sigData(chimpCorr, hg19rmskTable, filterTE = TRUE)
+
+#orangutan
+oranGene <- sigData(oranCorr, hg19ensTableMerge, filterTE = FALSE)
+oranTE <- sigData(oranCorr, hg19rmskTable, filterTE = TRUE)
+```
+
+Finally, save the six tables
+```{r}
+write.table(hmGeneMerge, file = "coordinates/hmKZNFsCorrd.csv", sep=",")
+write.table(hmTEMerge, file = "coordinates/hmTEsCoord.csv", sep=",")
+write.table(chimpGene, file = "coordinates/chimpKZNFsCorrd.csv", sep=",")
+write.table(chimpTE, file = "coordinates/chimpTEsCorrd.csv", sep=",")
+write.table(oranGene, file="coordinates/oranKZNFsCoord.csv", sep=",")
+write.table(oranTE, file="coordinates/oranTEsCoord.csv", sep=",")
+```
+
+
+<!--chapter:end:06-subset-coordinates.Rmd-->
+
+# Hierarchical clustering
+
+Load `twice` and other libraries. You need to load `plyr` first and then 
+`dplyr` to avoid conflict.
+
+```{r}
+library(twice)
+library(plyr)
+library(dplyr)
+```
+
+The first part, we visualize the differentially expressed krab-znfs comparing
+in three species. Load gene expression data and human krab-znfs reference:
+```{r}
+hmchimp <- read.csv("~/github/kap1/hmchimp_results/geneDESeq2Log2.csv")
+hmoran <- read.csv("~/github/kap1/hmoran_results/geneDESeq2Log2.csv")
+data("hmKZNFs337")
+
+```
+
+Filter gene expression to keep only KZNFs and merge by rownames to keep all.
+```{r}
+hmchimp <- hmchimp[rownames(hmchimp)%in%hmKZNFs337$ensembl_gene_id,]
+hmoran <- hmoran[rownames(hmoran) %in% hmKZNFs337$ensembl_gene_id,]
+
+repeatList <- intersect(rownames(hmchimp), rownames(hmoran))
+hmoran <- hmoran[!rownames(hmoran) %in% repeatList, ]
+
+```
+
+Bind all three species sample together
+```{r}
+df <- rbind.fill(hmchimp, hmoran)
+
+rownames(df) <- c(rownames(hmchimp), rownames(hmoran))
+colnames(df) <- c("H1", "H2", "H3", "C1", "C2", "C3", "O1", "O2", "O3")
+
+```
+
+Normalized in log2 scale and visualize the heatmap.
+```{r}
+log2df <- log2(df)
+
+#plot result
+kznfsComplexHeatmap(log2df)
+```
+
+
+Second part is to visualize transposable elements
+Load differentially expressed TEs files and select DE TEs in a list `te_list`
+```{r}
+# select de genes in human vs. chimpanzee
+hmchimpTEres <- read.csv("~/github/kap1/hmchimp_results/teDESeq2results.csv")
+
+hmchimpTEres_de <- hmchimpTEres %>% 
+    filter(padj < 0.05) %>%
+    filter(abs(log2FoldChange) > 1.2)
+hmchimpTEres_de_list <- rownames(hmchimpTEres_de)
+
+# select de genes in human vs. orangutans
+hmoranTEres <- read.csv("~/github/kap1/hmoran_results/teDESeq2results.csv")
+hmoranTEres_de <- hmoranTEres %>%
+    filter(padj < 0.05) %>%
+    filter(abs(log2FoldChange) > 1.2)
+hmoranTEres_de_list <- rownames(hmoranTEres_de)
+
+# combined data
+te_list <- intersect(hmchimpTEres_de_list, hmoranTEres_de_list)
+```
+
+Load expression data and visualize the top differentially 50 TEs based on variances 
+```{r}
+hmchimpTE <- read.csv("~/github/kap1/hmchimp_results/teDESeq2Log2.csv")
+hmoranTE <- read.csv("~/github/kap1/hmoran_results/teDESeq2Log2.csv")
+
+dfTE <- merge(hmchimpTE, hmoranTE[,c(4,5,6)], by = "row.names", all = FALSE)
+rownames(dfTE) <- dfTE$Row.names
+dfTE <- dfTE[,-1]
+
+dfTE <- dfTE[rownames(dfTE) %in% te_list,]
+colnames(dfTE) <- c("H1", "H2", "H3", "C1", "C2", "C3", "O1", "O2", "O3")
+
+teComplexHeatmap(as.matrix(log2(dfTE)), fileName = "~/TotalbCellsDETEHeatmap", top=50)
+
+```
+
+Next, we visualize and classified TEs based on class levels to have a better 
+resolution in each family.
+```{r}
+data(hg19rmsk_info)
+
+hg19rmsk_de <- hg19rmsk_info[hg19rmsk_info$gene_id %in% te_list, ]
+
+```
+
+Create transposable elements class lists to filter data. Here we separate to 
+LTR and non-LTR because LTR has 56 rows and the others are total 39 rows
+```{r}
+hg19_LTR_de <- hg19rmsk_de[hg19rmsk_de$class_id == "LTR", ] #56
+hg19_non_LTR_de <- hg19rmsk_de[hg19rmsk_de$class_id != "LTR", ] #39
+
+```
+
+
+Normalized expression data with log2(x+1), and visualize differentailly 
+expressed LTR, non-LTR TEs.
+```{r}
+dfTElog2 <- as.matrix(log2(dfTE + 1))
+
+teComplexHeatmap(
+    dfTElog2,
+    teFilter = hg19_non_LTR_de$gene_id,
+    teAnnot = hg19_non_LTR_de,
+    fileName = "img/deTEsnonLTR.pdf"
+)
+```
+```{r}
+teComplexHeatmap(
+    dfTElog2,
+    teFilter = hg19_LTR_de$gene_id,
+    top = 56,
+    teAnnot = hg19_LTR_de[,c(1,2)],
+    fileName = "img/deTEsLTR.pdf"
+)
+```
+
+
+<!--chapter:end:07-Hierarchical-clustering.Rmd-->
+
+# Abundance TEs
+
+Here we calculate the average abundance of transposable elements:
+
+```{r}
+library(tidyverse)
+```
+import transposable elements data
+```{r}
+hmTE <- read.csv("counts/hm_te.csv")
+chimpTE <- read.csv("counts/chimp_te.csv")
+oranTE <- read.csv("counts/oran_te.csv")
+```
+
+```{r}
+sumHmTE <- sum(hmTE[,c(4,5,6)])
+sumChimpTE <- sum(chimpTE[,c(4,5,6)])
+sumOranTE <- sum(oranTE[,c(4,5,6)])
+
+sumChimpTE/sumHmTE
+sumOranTE/sumHmTE
+```
+
+
+
+<!--chapter:end:08-abundance-TE.Rmd-->
+
+# Correlation pairs
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+theme_set(
+    theme_classic() +
+        theme(legend.position="top")
+)
+```
+
+
+```{r}
+dfhmchimp <- data.frame(
+    corr=c(rep(c("positive", "negative"), 2)),
+    species = factor(c("H", "H", "C", "C"), levels=c("H", "C")), 
+    pairs=c(73, 101, 109, 46)
+)
+
+(dfhmchimp)
+
+# plot
+p1 <- ggplot(dfhmchimp, aes(x=species, y=pairs)) +
+    geom_col(aes(color=corr, fill=corr), position=position_dodge(0.8), width=0.7) +
+    scale_fill_manual(values = c("#9999FF", "#FF6666")) +
+    scale_color_manual(values = c("#9999FF", "#FF6666"))
+
+p1 <- p1 + geom_text(
+    aes(label = pairs, group = corr),
+    position = position_dodge(0.8),
+    vjust = -0.3, size = 3.5
+)
+
+p1
+```
+
+```{r}
+dfhmoran <- data.frame(
+    corr=c(rep(c("positive", "negative"), 2)),
+    species = c("H", "H", "O", "O"), 
+    pairs=c(7, 16, 68, 62)
+)
+
+(dfhmoran)
+
+# plot
+p2 <- ggplot(dfhmoran, aes(x=species, y=pairs)) +
+    geom_col(aes(color=corr, fill=corr), position=position_dodge(0.8), width=0.7) +
+    scale_fill_manual(values = c("#9999FF", "#FF6666")) +
+    scale_color_manual(values = c("#9999FF", "#FF6666"))
+
+p2 <- p2 + geom_text(
+    aes(label = pairs, group = corr),
+    position = position_dodge(0.8),
+    vjust = -0.3, size = 3.5
+)
+
+p2
+
+```
+```{r}
+g <- ggarrange(
+    p1, p2, labels = c("A", "B"),
+    common.legend = TRUE, legned = "bottom"
+)
+
+ggsave(g, height = 7, file="corr_pairs_barplot.pdf")
+```
+
+
+<!--chapter:end:09-corr-pairs.Rmd-->
+
+# KRAB-ZNFs-TEs pairs
+
+```{r}
+library(twice)
+data("hg19rmsk_info")
+teInfo <- hg19rmsk_info
+```
+
+
+```{r}
+# human vs. chimpanzee
+# human
+dfhm <- read.csv("hmchimp_results/hmCorrResult.csv")
+
+kznfsTEsPairs(
+    dfhm, 
+    teInfo, 
+    title="Human KRAB-ZNFs & TEs pairs (Hm vs. Chimp)",
+    fileName="hmchimp_results/hmKZNFsTEsPairs.html"
+)
+
+#chimpanzee
+dfchimp <- read.csv("hmchimp_results/chimpCorrResult.csv")
+
+kznfsTEsPairs(
+    dfchimp,
+    teInfo,
+    title="Chimpanzee KRAB-ZNFs & TEs pairs (Hm vs. Chimp)",
+    fileName="hmchimp_results/chimpKZNFsTEsPairs.html"
+)
+
+```
+
+
+
+
+```{r}
+# human vs. orangutan
+# human
+dfhm <- read.csv("hmoran_results/hmCorrResult.csv")
+
+kznfsTEsPairs(
+    dfhm,
+    teInfo,
+    title="Human KRAB-ZNFs & TEs pairs (Hm vs. Orangutan)",
+    fileName="hmoran_results/hmKZNFsTEsPairs.html"
+)
+
+# orangutan
+dforan <- read.csv("hmoran_results/oranCorrResult.csv")
+kznfsTEsPairs(
+    dforan,
+    teInfo,
+    title="Orangutan KRAB-ZNFs & TEs pairs (Hm vs. Orangutan)",
+    fileName="hmoran_results/oranKZNFsTEsPairs.html"
+)
+
+```
+
+
+<!--chapter:end:10-kznfsTEsPairs.Rmd-->
+
+# Enrichment analysis human and chimpanzee
+
+```{r}
+library(clusterProfiler)
+library(enrichplot)
+library(ggplot2)
+library(org.Hs.eg.db)
+```
+
+
+Preparing Data:
+a csv file containing a list of gene names and log2 fold change values.
+We first try to analyze human and chimpanzee:
+```{r}
+dfhmchimp <- read.csv("hmchimp_results/geneDESeq2results.csv")
+
+# we want the log2 fold change
+original_gene_list <- dfhmchimp$log2FoldChange
+
+# name the vector
+names(original_gene_list) <- rownames(dfhmchimp)
+
+# omit any NA values
+gene_list <- na.omit(original_gene_list)
+
+# sort the list in decreasing order
+gene_list <- sort(gene_list, decreasing = TRUE)
+
+```
+
+Gene Set Enrichment
+you can access keytype using `keytypes(org.Hs.eg.db)`
+
+```{r}
+gse <- gseGO(geneList = gene_list,
+             ont = "ALL",
+             keyType = "ENSEMBL",
+             nPerm=10000,
+             minGSSize = 3,
+             maxGSSize = 800,
+             pvalueCutoff = 0.05,
+             verbose = TRUE,
+             OrgDb = "org.Hs.eg.db",
+             pAdjustMethod = "none")
+```
+```{r}
+require(DOSE)
+
+#show category can be changed
+dotplot(gse, showCategory=20, split=".sign") + facet_grid(.~.sign)
+```
+Enrichment Map:
+Enrichment map organizes enriched terms into a network with edges connecting
+overlapping gene sets. In this way, mutually overlapping gene sets are tend to 
+cluster together, making it easy to identify functional modules.
+```{r}
+gseaplot(gse, by = "all", title = gse$Description[1], geneSetID = 1)
+```
+
+KEGG Gene Set Enrichment Analysis
+```{r}
+organism <- "org.Hs.eg.db"
+
+# Convert gene IDs for gseKEGG function
+# We will lose some genes here because not all IDs will be converted
+ids<-bitr(names(original_gene_list), fromType = "ENSEMBL", toType = "ENTREZID", OrgDb=organism)
+
+# remove duplicate IDS (here I use "ENSEMBL", but it should be whatever was selected as keyType)
+dedup_ids = ids[!duplicated(ids[c("ENSEMBL")]),]
+
+# Create a new dataframe df2 which has only the genes which were successfully mapped using the bitr function above
+df2 = dfhmchimp[rownames(dfhmchimp) %in% dedup_ids$ENSEMBL,]
+
+# Create a new column in df2 with the corresponding ENTREZ IDs
+df2$Y = dedup_ids$ENTREZID
+
+# Create a vector of the gene unuiverse
+kegg_gene_list <- df2$log2FoldChange
+
+# Name vector with ENTREZ ids
+names(kegg_gene_list) <- df2$Y
+
+# omit any NA values 
+kegg_gene_list<-na.omit(kegg_gene_list)
+
+# sort the list in decreasing order (required for clusterProfiler)
+kegg_gene_list = sort(kegg_gene_list, decreasing = TRUE)
+```
+```{r}
+kegg_organism = "hsa"
+kk2 <- gseKEGG(geneList     = kegg_gene_list,
+               organism     = kegg_organism,
+               nPerm        = 10000,
+               minGSSize    = 3,
+               maxGSSize    = 800,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "none",
+               keyType       = "ncbi-geneid")
+```
+```{r}
+dotplot(kk2, showCategory = 10, title = "Enriched Pathways" , split=".sign") + facet_grid(.~.sign)
+```
+```{r}
+gseKEGG_table <- kk2@result
+head(gseKEGG_table)
+```
+### Pathview analysis
+This will create a PNG and different PDF of the enrichnemt KEGG pathway
+
+```{r}
+library(pathview)
+
+# produce the native KEGG plot (PNG)
+# set pathway ID based on the table above
+hsa <- pathview(
+    gene.data = kegg_gene_list,
+    pathway.id = "hsa04142",
+    species = kegg_organism,
+    kegg.native = T
+)
+
+knitr::include_graphics("hsa04142.pathview.png")
+
+```
+
+
+<!--chapter:end:11-enrichment-analysis-hmchimp.Rmd-->
+
+# Overexpressed human and chimpanzee
+
+
+```{r}
+library(clusterProfiler)
+library(wordcloud)
+library(org.Hs.eg.db)
+organism <- "org.Hs.eg.db"
+```
+### Prepare Input
+
+```{r}
+df <- read.csv("hmchimp_results/geneDESeq2results.csv")
+original_gene_list <- df$log2FoldChange
+names(original_gene_list) <- rownames(df)
+gene_list <- na.omit(original_gene_list)
+gene_list <- sort(gene_list, decreasing = TRUE)
+sig_genes_df <- subset(df, padj<0.05)
+genes <- sig_genes_df$log2FoldChange
+names(genes) <- rownames(sig_genes_df)
+genes <- na.omit(genes)
+genes <- genes[abs(genes) > 1.2]
+
+```
+
+### create gse object
+
+```{r}
+go_enrich <- enrichGO(gene = names(genes),
+                      universe = names(gene_list),
+                      OrgDb = organism, 
+                      keyType = 'ENSEMBL',
+                      readable = T,
+                      ont = "BP",
+                      pvalueCutoff = 0.05, 
+                      qvalueCutoff = 0.10)
+```
+
+# output
+### upsetplot
+emphasizing the genes overlapping among different gene sets
+
+```{r}
+library(enrichplot)
+upsetplot(go_enrich)
+```
+# wordcloud
+```{r}
+wcdf<-read.table(text=go_enrich$GeneRatio, sep = "/")[1]
+wcdf$term<-go_enrich[,2]
+wordcloud(words = wcdf$term, freq = wcdf$V1, scale=(c(4, .1)), colors=brewer.pal(8, "Dark2"), max.words = 25)
+```
+
+
+
+
+```{r}
+barplot(go_enrich, 
+        drop = TRUE, 
+        showCategory = 10, 
+        title = "GO Biological Pathways",
+        font.size = 8)
+```
+# Dotplot
+```{r}
+dotplot(go_enrich)
+```
+# Enrichment map
+Enrichment map organizes enriched terms into a network with edges connecting overlapping gene sets. In this way, mutually overlapping gene sets are tend to cluster together, making it easy to identify functional modules.
+
+```{r}
+x2 <- pairwise_termsim(go_enrich) 
+emapplot(x2)
+```
+# Enriched GO induced graph
+```{r}
+goplot(go_enrich, showCategory = 10)
+```
+# Categroy Netplot
+The cnetplot depicts the linkages of genes and biological concepts (e.g. GO terms or KEGG pathways) as a network (helpful to see which genes are involved in enriched pathways and genes that may belong to multiple annotation categories).
+
+```{r}
+# categorySize can be either 'pvalue' or 'geneNum'
+cnetplot(go_enrich, categorySize="pvalue", foldChange=gene_list)
+```
+
+# KEGG Pathway Enrichment
+perpared data
+```{r}
+# Convert gene IDs for enrichKEGG function
+# We will lose some genes here because not all IDs will be converted
+ids<-bitr(names(original_gene_list), fromType = "ENSEMBL", toType = "ENTREZID", OrgDb="org.Hs.eg.db") # remove duplicate IDS (here I use "ENSEMBL", but it should be whatever was selected as keyType)
+dedup_ids = ids[!duplicated(ids[c("ENSEMBL")]),]
+
+# Create a new dataframe df2 which has only the genes which were successfully mapped using the bitr function above
+df2 = df[rownames(df) %in% dedup_ids$ENSEMBL,]
+
+# Create a new column in df2 with the corresponding ENTREZ IDs
+df2$Y = dedup_ids$ENTREZID
+
+# Create a vector of the gene unuiverse
+kegg_gene_list <- df2$log2FoldChange
+
+# Name vector with ENTREZ ids
+names(kegg_gene_list) <- df2$Y
+
+# omit any NA values 
+kegg_gene_list<-na.omit(kegg_gene_list)
+
+# sort the list in decreasing order (required for clusterProfiler)
+kegg_gene_list = sort(kegg_gene_list, decreasing = TRUE)
+
+# Exctract significant results from df2
+kegg_sig_genes_df = subset(df2, padj < 0.05)
+
+# From significant results, we want to filter on log2fold change
+kegg_genes <- kegg_sig_genes_df$log2FoldChange
+
+# Name the vector with the CONVERTED ID!
+names(kegg_genes) <- kegg_sig_genes_df$Y
+
+# omit NA values
+kegg_genes <- na.omit(kegg_genes)
+
+# filter on log2fold change (PARAMETER)
+kegg_genes <- names(kegg_genes)[abs(kegg_genes) > 1.2]
+```
+Create enrichKEGG object
+organism KEGG Organism Code: The full list is here: https://www.genome.jp/kegg/catalog/org_list.html (need the 3 letter code). I define this as kegg_organism first, because it is used again below when making the pathview plots.
+keyType one of ‘kegg’, ‘ncbi-geneid’, ‘ncib-proteinid’ or ‘uniprot’.
+
+```{r}
+kegg_organism = "hsa"
+kk <- enrichKEGG(
+    gene=kegg_genes, 
+    universe=names(kegg_gene_list),
+    organism=kegg_organism, 
+    pvalueCutoff = 0.05, 
+    keyType = "ncbi-geneid"
+)
+```
+
+# barplot
+```{r}
+dotplot(
+    kk
+)
+```
+
+```{r}
+library(pathview)
+
+# Produce the native KEGG plot (PNG)
+hsa <- pathview(gene.data=gene_list, pathway.id="hsa", species = kegg_organism, gene.idtype=gene.idtype.list[3])
+
+# Produce a different plot (PDF) (not displayed here)
+hsa <- pathview(gene.data=gene_list, pathway.id="hsa04640", species = kegg_organism, gene.idtype=gene.idtype.list[3], kegg.native = T)
+
+knitr::include_graphics("dme04080.pathview.png")
+```
+
+
+
+<!--chapter:end:12-overexpressed-hmchimp.Rmd-->
+
+# Enrichment analysis human and orangutan
+
+```{r}
+library(clusterProfiler)
+library(enrichplot)
+library(ggplot2)
+library(org.Hs.eg.db)
+```
+
+
+Preparing Data:
+a csv file containing a list of gene names and log2 fold change values.
+We first try to analyze human and orangutan:
+```{r}
+dfhmchimp <- read.csv("hmoran_results/geneDESeq2results.csv")
+
+# we want the log2 fold change
+original_gene_list <- dfhmchimp$log2FoldChange
+
+# name the vector
+names(original_gene_list) <- rownames(dfhmchimp)
+
+# omit any NA values
+gene_list <- na.omit(original_gene_list)
+
+# sort the list in decreasing order
+gene_list <- sort(gene_list, decreasing = TRUE)
+
+```
+
+Gene Set Enrichment
+you can access keytype using `keytypes(org.Hs.eg.db)`
+
+```{r}
+gse <- gseGO(geneList = gene_list,
+             ont = "ALL",
+             keyType = "ENSEMBL",
+             nPerm=10000,
+             minGSSize = 3,
+             maxGSSize = 800,
+             pvalueCutoff = 0.05,
+             verbose = TRUE,
+             OrgDb = "org.Hs.eg.db",
+             pAdjustMethod = "none")
+```
+
+
+```{r}
+require(DOSE)
+
+#show category can be changed
+dotplot(gse, showCategory=20, split=".sign") + facet_grid(.~.sign)
+```
+Enrichment Map:
+Enrichment map organizes enriched terms into a network with edges connecting
+overlapping gene sets. In this way, mutually overlapping gene sets are tend to 
+cluster together, making it easy to identify functional modules.
+```{r}
+gseaplot(gse, by = "all", title = gse$Description[1], geneSetID = 1)
+```
+
+KEGG Gene Set Enrichment Analysis
+```{r}
+organism <- "org.Hs.eg.db"
+
+# Convert gene IDs for gseKEGG function
+# We will lose some genes here because not all IDs will be converted
+ids<-bitr(names(original_gene_list), fromType = "ENSEMBL", toType = "ENTREZID", OrgDb=organism)
+
+# remove duplicate IDS (here I use "ENSEMBL", but it should be whatever was selected as keyType)
+dedup_ids = ids[!duplicated(ids[c("ENSEMBL")]),]
+
+# Create a new dataframe df2 which has only the genes which were successfully mapped using the bitr function above
+df2 = dfhmchimp[rownames(dfhmchimp) %in% dedup_ids$ENSEMBL,]
+
+# Create a new column in df2 with the corresponding ENTREZ IDs
+df2$Y = dedup_ids$ENTREZID
+
+# Create a vector of the gene unuiverse
+kegg_gene_list <- df2$log2FoldChange
+
+# Name vector with ENTREZ ids
+names(kegg_gene_list) <- df2$Y
+
+# omit any NA values 
+kegg_gene_list<-na.omit(kegg_gene_list)
+
+# sort the list in decreasing order (required for clusterProfiler)
+kegg_gene_list = sort(kegg_gene_list, decreasing = TRUE)
+```
+```{r}
+kegg_organism = "hsa"
+kk2 <- gseKEGG(geneList     = kegg_gene_list,
+               organism     = kegg_organism,
+               nPerm        = 10000,
+               minGSSize    = 3,
+               maxGSSize    = 800,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "none",
+               keyType       = "ncbi-geneid")
+```
+```{r}
+dotplot(kk2, showCategory = 10, title = "Enriched Pathways" , split=".sign") + facet_grid(.~.sign)
+```
+```{r}
+gseKEGG_table <- kk2@result
+head(gseKEGG_table)
+```
+### Pathview analysis
+This will create a PNG and different PDF of the enrichnemt KEGG pathway
+
+```{r}
+library(pathview)
+
+# produce the native KEGG plot (PNG)
+# set pathway ID based on the table above
+hsa <- pathview(
+    gene.data = kegg_gene_list,
+    pathway.id = "hsa04142",
+    species = kegg_organism,
+    kegg.native = T
+)
+
+knitr::include_graphics("hsa04142.pathview.png")
+
+```
+
+
+<!--chapter:end:13-enrichment-analysis_hmoran.Rmd-->
+
+# Overexpressed human and orangutan
+
+
+```{r}
+library(clusterProfiler)
+library(wordcloud)
+library(org.Hs.eg.db)
+organism <- "org.Hs.eg.db"
+```
+
+### Prepare Input
+
+```{r}
+df <- read.csv("hmoran_results/geneDESeq2results.csv")
+original_gene_list <- df$log2FoldChange
+names(original_gene_list) <- rownames(df)
+gene_list <- na.omit(original_gene_list)
+gene_list <- sort(gene_list, decreasing = TRUE)
+sig_genes_df <- subset(df, padj<0.05)
+genes <- sig_genes_df$log2FoldChange
+names(genes) <- rownames(sig_genes_df)
+genes <- na.omit(genes)
+genes <- genes[abs(genes) > 1.2]
+
+```
+
+### create gse object
+
+```{r}
+go_enrich <- enrichGO(gene = names(genes),
+                      universe = names(gene_list),
+                      OrgDb = organism, 
+                      keyType = 'ENSEMBL',
+                      readable = T,
+                      ont = "BP",
+                      pvalueCutoff = 0.05, 
+                      qvalueCutoff = 0.10)
+```
+
+# output
+### upsetplot
+emphasizing the genes overlapping among different gene sets
+
+```{r}
+library(enrichplot)
+upsetplot(go_enrich)
+```
+# wordcloud
+```{r}
+wcdf<-read.table(text=go_enrich$GeneRatio, sep = "/")[1]
+wcdf$term<-go_enrich[,2]
+wordcloud(words = wcdf$term, freq = wcdf$V1, scale=(c(4, .1)), colors=brewer.pal(8, "Dark2"), max.words = 25)
+```
+
+
+
+
+```{r}
+barplot(go_enrich, 
+        drop = TRUE, 
+        showCategory = 10, 
+        title = "GO Biological Pathways",
+        font.size = 8)
+```
+# Dotplot
+```{r}
+dotplot(go_enrich)
+```
+# Enrichment map
+Enrichment map organizes enriched terms into a network with edges connecting overlapping gene sets. In this way, mutually overlapping gene sets are tend to cluster together, making it easy to identify functional modules.
+
+```{r}
+x2 <- pairwise_termsim(go_enrich) 
+emapplot(x2)
+```
+# Enriched GO induced graph
+```{r}
+goplot(go_enrich, showCategory = 10)
+```
+# Categroy Netplot
+The cnetplot depicts the linkages of genes and biological concepts (e.g. GO terms or KEGG pathways) as a network (helpful to see which genes are involved in enriched pathways and genes that may belong to multiple annotation categories).
+
+```{r}
+# categorySize can be either 'pvalue' or 'geneNum'
+cnetplot(go_enrich, categorySize="pvalue", foldChange=gene_list)
+```
+
+# KEGG Pathway Enrichment
+perpared data
+```{r}
+# Convert gene IDs for enrichKEGG function
+# We will lose some genes here because not all IDs will be converted
+ids<-bitr(names(original_gene_list), fromType = "ENSEMBL", toType = "ENTREZID", OrgDb="org.Hs.eg.db") # remove duplicate IDS (here I use "ENSEMBL", but it should be whatever was selected as keyType)
+dedup_ids = ids[!duplicated(ids[c("ENSEMBL")]),]
+
+# Create a new dataframe df2 which has only the genes which were successfully mapped using the bitr function above
+df2 = df[rownames(df) %in% dedup_ids$ENSEMBL,]
+
+# Create a new column in df2 with the corresponding ENTREZ IDs
+df2$Y = dedup_ids$ENTREZID
+
+# Create a vector of the gene unuiverse
+kegg_gene_list <- df2$log2FoldChange
+
+# Name vector with ENTREZ ids
+names(kegg_gene_list) <- df2$Y
+
+# omit any NA values 
+kegg_gene_list<-na.omit(kegg_gene_list)
+
+# sort the list in decreasing order (required for clusterProfiler)
+kegg_gene_list = sort(kegg_gene_list, decreasing = TRUE)
+
+# Exctract significant results from df2
+kegg_sig_genes_df = subset(df2, padj < 0.05)
+
+# From significant results, we want to filter on log2fold change
+kegg_genes <- kegg_sig_genes_df$log2FoldChange
+
+# Name the vector with the CONVERTED ID!
+names(kegg_genes) <- kegg_sig_genes_df$Y
+
+# omit NA values
+kegg_genes <- na.omit(kegg_genes)
+
+# filter on log2fold change (PARAMETER)
+kegg_genes <- names(kegg_genes)[abs(kegg_genes) > 1.2]
+```
+Create enrichKEGG object
+organism KEGG Organism Code: The full list is here: https://www.genome.jp/kegg/catalog/org_list.html (need the 3 letter code). I define this as kegg_organism first, because it is used again below when making the pathview plots.
+keyType one of ‘kegg’, ‘ncbi-geneid’, ‘ncib-proteinid’ or ‘uniprot’.
+
+```{r}
+kegg_organism = "hsa"
+kk <- enrichKEGG(
+    gene=kegg_genes, 
+    universe=names(kegg_gene_list),
+    organism=kegg_organism, 
+    pvalueCutoff = 0.05, 
+    keyType = "ncbi-geneid"
+)
+```
+
+# barplot
+```{r}
+dotplot(
+    kk
+)
+```
+
+```{r}
+library(pathview)
+
+# Produce the native KEGG plot (PNG)
+hsa <- pathview(gene.data=gene_list, pathway.id="hsa", species = kegg_organism, gene.idtype=gene.idtype.list[3])
+
+# Produce a different plot (PDF) (not displayed here)
+hsa <- pathview(gene.data=gene_list, pathway.id="hsa04640", species = kegg_organism, gene.idtype=gene.idtype.list[3], kegg.native = T)
+
+knitr::include_graphics("dme04080.pathview.png")
+```
+
+
+
+<!--chapter:end:14-overexpressed-hmoran.Rmd-->
+
+# Human specific KRAB-ZNFs
+
+Load package
+
+```{r}
+library(TEKRABber)
+library(twice)
+```
+
+We first load human kznfs reference data and human data:
+
+```{r}
+data("hmKZNFs337")
+hm <- read.csv("counts/hm_gene.csv")
+head(hm)
+```
+So, we have 8919 genes from human B cells data. We filter it with 337 KRAB-ZNFs 
+list and add common name.
+
+```{r}
+hm_kznfs <- merge(
+    hm, 
+    hmKZNFs337,
+    by.x = "gene",
+    by.y = "ensembl_gene_id"
+)
+
+head(hm_kznfs)
+```
+We found 81 human KRAB-ZNFs from our data. Then we try to calculate the 
+correlation between transposable elements. We first load human TE expression 
+data.
+
+```{r}
+hmTE <- read.csv("counts/hm_te.csv")
+head(hmTE)
+```
+We have **992 TEs** data and **81 KRAB-ZNFs** data. We prepared the data format
+ to analyze correlation.
+
+```{r}
+rownames(hm_kznfs) <- hm_kznfs$external_gene_name
+hmKZNFsInput <- hm_kznfs[,c(2,3,4)]
+
+rownames(hmTE) <- hmTE$name
+hmTEsInput <- hmTE[,c(4,5,6)]
+
+# use TEKRABber function
+hmCorrResult <- corrOrthologTE(
+    geneInput = hmKZNFsInput,
+    teInput = hmTEsInput,
+    corrMethod = "pearson",
+    padjMethod = "fdr"
+)
+
+write.table(hmCorrResult, file="hm_results/hmCorrResult81.csv", sep=",")
+```
+
+By using `TEKRABber::corrOrthologTE()`, we can obtain 81*992 result in 10 
+minutes. Then we investigate results and there are 295 rows of data.
+
+```{r}
+hmCorrResult.sig <- hmCorrResult[hmCorrResult$padj<0.05, ]
+hmCorrResult.sig <- na.omit(hmCorrResult.sig)
+print(paste0("there are ", nrow(hmCorrResult.sig), " rows of significant results"))
+
+```
+```{r}
+(unique(hmCorrResult.sig$geneName))
+(unique(hmCorrResult.sig$teName))
+```
+Let us see if there are positive and negative correlations.
+
+```{r}
+hmCorrResult.sig.positve <- hmCorrResult.sig[hmCorrResult.sig$coef>0, ]
+hmCorrResult.sig.negative <- hmCorrResult.sig[hmCorrResult.sig$coef<0, ]
+
+(paste0("There are ", nrow(hmCorrResult.sig.positve), " positive correlation"))
+(paste0("There are ", nrow(hmCorrResult.sig.negative), " negative correlation"))
+```
+Let's create a KRAB-ZNFs and TEs pairs table using `twice::kznfsTEsPairs()`
+```{r}
+data("hg19rmsk_info")
+hmkznfsTEsPairs <- kznfsTEsPairs(hmCorrResult.sig, hg19rmsk_info)
+```
+### Find and compare to KRAB-ZNFs to chimpanzee and orangutan  
+We first load data:
+
+```{r}
+hmchimpCorr <- read.csv("hmchimp_results/hmCorrResult.csv")
+hmchimpCorr.sig <- hmchimpCorr[hmchimpCorr$padj<0.05, ]
+hmchimpCorr.sig <- na.omit(hmchimpCorr.sig)
+head(hmchimpCorr.sig)
+```
+```{r}
+# data
+hm <- hmCorrResult.sig$geneName
+hmchimp <- hmchimpCorr.sig$geneName
+
+setdiff(hm, hmchimp)
+```
+
+```{r}
+#hmoran
+hm <- read.csv("hmoran_results/hmCorrResult.csv")
+hm <- hm[hm$padj < 0.05, ]
+hm <- na.omit(hm)
+hmoran <- unique(hm$geneName)
+(setdiff(hm, hmoran))
+
+oran <- read.csv("hmoran_results/oranCorrResult.csv")
+oran <- oran[oran$padj < 0.05, ]
+oran <- na.omit(oran)
+unique(oran$teName)
+```
+
+We try to compare to ortholog table referring to BioMat data
+```{r}
+library(biomaRt)
+
+speciesRef <- "hsapiens"
+speciesCompare <- "pabelii"
+geneRef <- paste0(speciesRef, "_gene_ensembl")
+geneCompare <- paste0(speciesCompare, "_gene_ensembl")
+orthologyRef <- paste0(speciesRef, "_homolog_orthology_confidence")
+
+ensemblRef <- biomaRt::useEnsembl("ensembl", dataset = geneRef, version = "105")
+ensemblCompare <- biomaRt::useEnsembl("ensembl", dataset = geneCompare, version = "105")
+
+orthologTable <- biomaRt::getLDS(
+    attributes = c(
+        "external_gene_name",
+        "chromosome_name",
+        "ensembl_gene_id",
+        "start_position",
+        "end_position"
+    ),
+    mart = ensemblRef,
+    attributesL = c(
+        "external_gene_name",
+        "ensembl_gene_id",
+        "start_position",
+        "end_position",
+        orthologyRef
+    ),
+    martL = ensemblCompare
+)
+
+```
+
+
+<!--chapter:end:15-human-Specific-KZNFs.Rmd-->
+
+# Age of KRAB-ZNFs
+
+```{r}
+library(twice)
+library(plotly)
+```
+```{r}
+data(hg38age)
+
+# hm expression
+dfhm <- read.csv("hm_results/hmCorrResult81.csv")
+
+# extract 81 kznfs
+znfs <- unique(dfhm$geneName)
+
+hg38age_znfs <- hg38age[hg38age$geneName %in% znfs,]
+
+```
+
+```{r}
+znfs_exclude <- dfhm[!('%in%'(dfhm$geneName, hg38age_znfs$geneName)),]
+# total 11 exlude KRAB-ZNFs not in GenTree data
+```
+
+#### is significant correlation of KZNFs are relatively young?
+```{r}
+dfhm.sig <- dfhm %>%
+    filter(pvalue < 0.05)
+
+znfs.sig <- unique(dfhm.sig$geneName)
+
+```
+
+#### human and chimpanzee
+```{r}
+hmchimp <- read.csv("hmchimp_results/hmCorrResult.csv")
+hmchimp_znfs <- unique(hmchimp$geneName)
+hmchimp_znfs_exclude <- dfhm[!('%in%'(dfhm$geneName, hmchimp_znfs)),]
+unique(hmchimp_znfs_exclude$geneName)
+```
+
+
+<!--chapter:end:16-kznfs-age.Rmd-->
+
+# correlation percentage
+
+Here we try to shuffle data to see the gene have negative or positive 
+correlations comparing to approx. 50% KRAB-ZNFs (42 out of 81) in human. 
+Design:  
+1. remove krab-znfs from data
+2. 
+
+Load pacakge
+```{r}
+library(TEKRABber)
+library(twice)
+library(dplyr)
+```
+
+Load data and transform to the format for `corrOrthologTE()`
+
+```{r}
+data("hmKZNFs337")
+gene <- read.csv("counts/hm_gene.csv")
+te <- read.csv("counts/hm_te.csv")
+
+# remove krab-znfs from gene
+gene_filter <- gene[!(gene$gene %in% hmKZNFs337$ensembl_gene_id), ]
+rownames(gene_filter) <- gene_filter$gene
+gene_filter <- gene_filter[,c(2,3,4)]
+
+# set row names of TE
+rownames(te) <- te$name
+te <- te[,c(4,5,6)]
+
+```
+
+Here we set `set.seed(84)` for reproducibility, and calculate correlation.
+
+```{r}
+set.seed(84)
+
+iter <- c()
+percentage <- c()
+
+for (i in 1:3){
+    idx <- sample(8838, size=80)
+    gene_table <- gene_filter[idx, ]
+    #myfile <- paste0(format(Sys.time(), "%s_%b_%d", ".csv"))
+    
+    result <- corrOrthologTE(
+        gene_table,
+        te
+    )
+    
+    count <- length(unique(result$geneName))
+    result.sig <- result %>%
+        filter(padj < 0.05)
+    count.sig <- length(unique(result.sig$geneName))
+    iter <- c(iter, as.character(i))
+    percentage <- c(percentage, count.sig/count)
+}
+
+df_output <- data.frame(
+    num = iter,
+    per = percentage
+)
+
+```
+
+#### Analyze 200 time of percentage
+Here we take `set.seed(84)` first 200 result of percentage
+```{r}
+df200 <- read.csv("hm_results/percentage_result/percentage.csv")
+head(df200)
+```
+
+# plot result
+```{r}
+# plot histogram
+library(tidyverse)
+library(hrbrthemes)
+
+p <- df200 %>%
+    ggplot(aes(x=per)) +
+    geom_histogram(binwidth=0.02, fill="#69b3a2", color="#e9ecef", alpha=0.9) +
+    geom_density(color="#e1744d", alpha=0.8) +
+    ggtitle("Siginificantly Correlation (200 iterations)") +
+    geom_vline(xintercept = 0.519, linetype="dashed", color="#4181a4", size=1.5) +
+    labs(
+        subtitle = "Randomly selected 80 genes w/o KRAB-ZNFs & 992 TEs",
+        tag = "Figure",
+        x = "percentage",
+        y = "Count/Density",
+    ) +
+    annotate(
+        geom = "text",
+        x = 0.525,
+        y = 32,
+        label = "KRAB-ZNFs \nper. 52% \ndensity 0.89",
+        hjust = 0
+    ) +
+    theme_minimal(
+        base_size = 20
+    )
+```
+
+#### compare all genes and all tes
+```{r}
+# create gene input data
+df_gene <- gene
+rownames(df_gene) <- gene$gene
+df_gene <- df_gene[,c(2,3,4)]
+
+# create te input data
+df_te <- te
+rownames(df_te) <- te$name
+df_te <- df_te[,c(4,5,6)]
+
+# run correlation, first 10 rows
+corrOrthologTE(
+    geneInput = df_gene[c(1:10), ],
+    teInput = df_te[c(1:10), ],
+    padjMethod = "fdr",
+    fileDir = "hm_results"
+)
+
+```
+
+
+<!--chapter:end:17-correlation-percentage.Rmd-->
+
+# Distance estimattion
+
+In this analysis, we want to see if negative or positive correlation between KRAB-ZNFs and TEs are related to their distance on chromosome. We only can compare KRAB-ZNFs and TEs on the same chromosome.
+1. Extract positive/negative correlation pairs from human data
+2. Filter them from coordinates reference
+3. caculate distance and save results as a dataframe
+
+```{r}
+library(twice)
+library(dplyr)
+library(biomaRt)
+```
+
+
+### Extract positive / negative correlation pairs
+
+```{r}
+hmCorr <- read.csv("hm_results/hmCorrResult81.csv")
+hmCorr.sig <- hmCorr %>%
+    filter(padj < 0.05)
+hmCorr.sig$geneName[1]
+hmCorr.sig$teName[1]
+```
+### filter them from coordinates reference
+#### Load coordinate data
+You can find tutorial [here](http://grch37.ensembl.org/info/data/biomart/biomart_r_package.html)
+```{r}
+# get significant znfs and TEs name
+znfs <- unique(hmCorr.sig$geneName)
+tes <- unique(hmCorr.sig$teName)
+
+# get hg19 coordinates information
+grch37 <- useEnsembl(biomart = "ensembl", GRCh=37) 
+listDatasets(grch37)
+
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl", GRCh=37)
+
+ensembl_gene <- getBM(
+    attributes = c('ensembl_gene_id',
+                   'hgnc_symbol',
+                   'chromosome_name',
+                   'start_position',
+                   'end_position'),
+    mart = ensembl
+)
+
+
+# filter znfs
+ensembl_gene_znfs <- ensembl_gene[ensembl_gene$hgnc_symbol %in% znfs, ]
+ensembl_gene_znfs[42, "chromosome_name"] <- "19" #modified previous unknown result
+
+```
+
+#### Load TE coordinate
+
+we based on the chromosome number and te name from correlation result to filter some data
+```{r}
+data("hg19rmsk_gtf")
+
+chr_list <- unique(ensembl_gene_znfs$chromosome_name)
+
+#filter chromosome
+df_te <- hg19rmsk_gtf
+df_te$seqnames <- substr(df_te$seqnames, 4, length(df_te$seqnames)) # remove chr
+df_te <- df_te %>% 
+    filter(seqnames %in% chr_list) %>%
+    filter(gene_id %in% tes)
+
+```
+
+#### Now the input data are ready and we can now write algorithm
+```{r include=FALSE}
+# 1. iterate through chr number
+# 2. calculate mean value and decide which will be first and second
+# 4. calculate distance and add rows to dataframe
+
+# initialize an empty dataframe
+df <- data.frame(
+    Chr = character(),
+    KRAB_ZNFs = character(),
+    TEs = character(),
+    distance = numeric(),
+    pos_or_neg = character()
+)
+
+for (chr in chr_list){
+    
+    dfGene <- ensembl_gene_znfs[ensembl_gene_znfs$chromosome_name==chr, ]
+    dfTE <- df_te[df_te$seqnames==chr, ]
+    df_idx <- 0
+    
+    for (i in 1:nrow(dfGene)){
+        for (j in 1:nrow(dfTE)){
+
+            geneMean <- mean(c(dfGene$start_position[i], dfGene$end_position[i]))
+            teMean <- mean(c(dfTE$start[j], dfTE$end[j]))
+            dis <- 0
+            
+            # check if the data exist in the correlation table
+            check_status <- hmCorr.sig[
+                hmCorr.sig$geneName==dfGene$hgnc_symbol[i] &
+                    hmCorr.sig$teName==dfTE$gene_id[j],
+            ]
+            
+            if (nrow(check_status)>0) {
+
+                if (geneMean > teMean){
+                    dis <- dfGene$start_position[i] - dfTE$end[j]
+                } else {
+                    dis <- dfTE$start[j] - dfGene$end_position[i]
+                }
+
+                coef <- hmCorr.sig[hmCorr.sig$geneName==dfGene$hgnc_symbol[i] &
+                                       hmCorr.sig$teName==dfTE$gene_id[j], "coef"]
+                
+                coef_result <- ifelse(coef>0, "pos", "neg")
+                
+                df_idx <- df_idx + 1
+                df[df_idx, ] <- c(
+                    chr,
+                    dfGene$hgnc_symbol[i],
+                    dfTE$gene_id[j],
+                    dis,
+                    ifelse(coef>0, "pos", "neg")
+                )
+            }
+        }
+    }
+
+}
+
+df$distance <- as.numeric(df$distance)
+
+write.table(df, "hm_results/kznfsTEs_distance.csv", sep=",")
+```
+
+#### Visualize the results
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(hrbrthemes)
+library(viridis)
+```
+```{r}
+# ZNF782
+znf782 <- df %>%
+    filter(KRAB_ZNFs=="ZNF782") %>%
+    mutate(distance = log2(distance))
+
+p.znf782 <- znf782 %>%
+  ggplot( aes(x=distance, fill=pos_or_neg)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'identity') +
+    scale_fill_manual(values=c("#69b3a2", "#404080")) +
+    theme_ipsum() +
+    labs(fill="")
+
+p.znf782
+```
+
+
+
+```{r}
+ggplot(df, aes(x=KRAB_ZNFs, y=distance/1000000, fill=pos_or_neg)) +
+    geom_boxplot() +
+    theme_ipsum_tw(base_size=14) +
+    xlab("KRAB-ZNFs") +
+    ylab("distance(bp/1e+06)")
+```
+#### Density plot
+```{r}
+ggplot(df, aes(x=distance/1000000, group=pos_or_neg, fill=pos_or_neg)) +
+    geom_density(adjust=1.5, alpha=.4) +
+    theme_ipsum(
+        base_size = 16
+    ) + 
+    xlab("distance(bp/1e+06)")
+```
+
+
+<!--chapter:end:18-distance-estimation.Rmd-->
+
+# proportion TEs
+
+```{r}
+library(twice)
+library(dplyr)
+library(ggplot2)
+library(hrbrthemes)
+```
+
+Load TE data from human, chimpanzee, orangutan respectively.
+First analyze human data:
+
+```{r}
+# load hmTE
+hmTE <- read.csv("counts/hm_te.csv")
+hmCorr <- read.csv("hm_results/hmCorrResult81.csv")
+
+# select significant result and obtain TE name in list
+hmCorr.sig <- hmCorr %>% filter(padj<0.05)
+hm_te_list <- unique(hmCorr.sig$teName)
+
+# percentage of expression
+te_all_sum <- sum(colSums(hmTE[,c(4,5,6)]))
+te_select_sum <- sum(colSums(hmTE[hmTE$name %in% hm_te_list, c(4,5,6)]))
+te_select_sum / te_all_sum
+
+# visualize 
+hmTE <- hmTE %>% mutate(mean = (GM18558 + GM18960 + GM19240)/3)
+hmTE$group <- ifelse(hmTE$name %in% hm_te_list, "KZNFs-TEs", "other-TEs")
+p1 <- hmTE %>%
+    ggplot(aes(x=log2(mean + 1), fill=group)) +
+    geom_histogram(color="#e9ecef", alpha=0.6, position='identity') +
+    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    labs(fill="", tag = "A") +
+    ggtitle("human") +
+    theme_light()
+
+p1 <- p1 + 
+    coord_cartesian(xlim = c(0, 15), ylim=c(0, 125)) +
+    theme(
+        legend.text = element_text(size=12),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_text(size=12),
+        plot.title = element_text(hjust=0.5),
+        legend.spacing.x = unit(0.5, 'cm')
+    ) 
+    
+```
+
+Second analyze chimpanzee data:
+```{r}
+chimpTE <- read.csv("counts/chimp_te.csv")
+chimpCorr <- read.csv("hmchimp_results/chimpCorrResult.csv")
+
+chimpCorr.sig <- chimpCorr %>% filter(padj<0.05) 
+chimp_te_list <- unique(chimpCorr.sig$teName) #83
+
+# percentage of expression
+te_all_sum <- sum(colSums(chimpTE[,c(4,5,6)]))
+te_select_sum <- sum(colSums(chimpTE[chimpTE$name %in% chimp_te_list, c(4,5,6)]))
+te_select_sum / te_all_sum
+
+chimpTE <- chimpTE %>% mutate(mean = (Judith+Leo+Maryke)/3)
+chimpTE$group <- ifelse(chimpTE$name %in% chimp_te_list, "KZNFs-TEs", "other-TEs")
+
+p2 <- chimpTE %>%
+    ggplot(aes(x=log2(mean + 1), fill=group)) +
+    geom_histogram(color="#e9ecef", alpha=0.6, position='identity') +
+    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    labs(fill="", tag = "B") +
+    ggtitle("chimpanzee") +
+    theme_light()
+
+p2 <- p2 + 
+    coord_cartesian(xlim = c(0, 15), ylim=c(0, 125)) +
+    theme(
+        legend.text = element_text(size=12),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_text(size=12),
+        plot.title = element_text(hjust=0.5),
+        legend.spacing.x = unit(0.5, 'cm')
+    ) 
+```
+
+Third analyze orangutan data:
+```{r}
+oranTE <- read.csv("counts/oran_te.csv")
+oranCorr <- read.csv("hmoran_results/oranCorrResult.csv")
+
+oranCorr.sig <- oranCorr %>% filter(padj<0.05) 
+oran_te_list <- unique(oranCorr.sig$teName) #69
+
+# percentage of expression
+te_all_sum <- sum(colSums(oranTE[,c(4,5,6)]))
+te_select_sum <- sum(colSums(oranTE[oranTE$name %in% oran_te_list, c(4,5,6)]))
+te_select_sum / te_all_sum
+
+oranTE <- oranTE %>% mutate(mean = (Guchi+Jaqo+Jingjing)/3)
+
+oranTE$group <- ifelse(oranTE$name %in% oran_te_list, "KZNFs-TEs", "other-TEs")
+
+p3 <- oranTE %>%
+    ggplot(aes(x=log2(mean + 1), fill=group)) +
+    geom_histogram(color="#e9ecef", alpha=0.6, position='identity') +
+    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    labs(fill="", tag = "C") +
+    ggtitle("orangutan") +
+    theme_light()
+
+p3 <- p3 + 
+    coord_cartesian(xlim = c(0, 15), ylim=c(0, 125)) +
+    theme(
+        legend.text = element_text(size=12),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_text(size=12),
+        plot.title = element_text(hjust=0.5),
+        legend.spacing.x = unit(0.5, 'cm')
+    ) 
+```
+
+```{r}
+library(ggpubr)
+
+g <- ggarrange(
+    p1, p2, p3, common.legend = TRUE, 
+    ncol = 3, nrow = 1, legend = "bottom",
+    font.label = list(size=12))
+
+ggsave(g, height = 4, width = 12, filename = "~/Desktop/test.jpg", dpi=400, bg="white")
+```
+
+```{r}
+figure <- ggarrange(
+    p1 + rremove("ylab") + rremove("xlab"), 
+    p2 + rremove("ylab") + rremove("xlab"),
+    p3 + rremove("ylab") + rremove("xlab"), 
+    labels = NULL, ncol = 3, nrow = 1,
+    common.legend = TRUE, legend = "bottom",
+    align = "hv", 
+    font.label = list(
+        size = 10, color = "black", face = "bold", 
+        family = NULL, position = "top")
+    )
+
+annotate_figure(figure, left = textGrob("Common y-axis", rot = 90, vjust = 1, gp = gpar(cex = 1.3)),
+                    bottom = textGrob("Common x-axis", gp = gpar(cex = 1.3)))
+```
+
+
+
+
+<!--chapter:end:19-proportion-TE.Rmd-->
+

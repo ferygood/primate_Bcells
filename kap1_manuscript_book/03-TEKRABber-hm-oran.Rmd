@@ -1,0 +1,128 @@
+# TEKRABber analysis human and orangutan
+In this chapter, we will run all TEKRABber analysis, comparing **human and orangutan**, including normalizing the data, differentially expressed analysis and 
+correlation analysis. The R script file name of this chapter is `03-TEKRABber-hm-oran.Rmd`.
+
+```{r load packages}
+library(TEKRABber)
+library(tidyverse)
+library(twice)
+```
+
+We first import the gene count and TE count table of human and chimpanzee which 
+we combined previously. Then use their mean expression value with orthology 
+information from Ensembl biomart.
+```{r import data and calculate scaling factor}
+# load data
+hmGene <- read.csv("data/counts/hm_gene.csv")
+hmTE <- read.csv("data/counts/hm_te.csv")
+hmTE <- hmTE[,c(1,4,5,6)]
+oranGene <- read.csv("data/counts/oran_gene.csv")
+oranTE <- read.csv("data/counts/oran_te.csv")
+oranTE <- oranTE[,c(1,4,5,6)]
+
+fetchData <- orthologScale(
+  geneCountRef = hmGene,
+  geneCountCompare = oranGene,
+  speciesRef = 'hsapiens',
+  speciesCompare = 'pabelii'
+)
+```
+
+Then we use `DECorrInputs` function to create input tables for running DE analysis and 
+correlation analysis.
+```{r create input files for DE analysis and correlation analysis}
+inputBundle <- DECorrInputs(
+  orthologTable = fetchData$orthologTable,
+  scaleFactor = fetchData$scaleFactor,
+  geneCountRef = hmGene,
+  geneCountCompare = oranGene,
+  teCountRef = hmTE,
+  teCountCompare = oranTE
+)
+```
+
+To run DE analysis, we need to create a metadata for it (similar to the preparation of DESeq2). The function for this step is `DEgeneTE`.
+```{r DE analysis}
+meta <- data.frame(
+  species = c(rep("human", ncol(hmGene)-1), 
+              rep("orangutans", ncol(oranGene)-1))
+)
+
+meta$species <- factor(meta$species, levels = c("human", "orangutans"))
+rownames(meta) <- colnames(inputBundle$geneInputDESeq2)
+hmoranDE <- DEgeneTE(
+  geneTable = inputBundle$geneInputDESeq2,
+  teTable = inputBundle$teInputDESeq2,
+  metadata = meta,
+  expDesign = TRUE,
+  fileDir = "results/hmoran"
+)
+
+```
+
+In this step, we calculate the correlation between selected KRAB-ZNFs with TEs.
+We first load KRAB-ZNFs information and filter them from all genes. Then we load 
+input data from previous input Bundle, here we also want to see the effect of 
+KAP1 (ENSG00000130726), so we include it from all gene.
+```{r correlation analysis}
+# load kznfs 
+data(hmKZNFs337)
+hm337 <- hmKZNFs337
+ensembl_id <- c(hm337$ensembl_gene_id, "ENSG00000130726") # ENSG00000130726 = KAP1, TRIM28
+
+# load ortholog data
+hmGeneCorrInput <- inputBundle$geneCorrInputRef
+hmGeneCorrInput <- hmGeneCorrInput[rownames(hmGeneCorrInput) %in% ensembl_id,]
+oranGeneCorrInput <- inputBundle$geneCorrInputCompare
+oranGeneCorrInput <- oranGeneCorrInput[rownames(oranGeneCorrInput) %in% ensembl_id,]
+
+# filter gene name and add KAP1
+gene.name <- hm337[hm337$ensembl_gene_id %in% rownames(hmGeneCorrInput),]
+gene.name <- rbind(gene.name, c("ENSG00000130726", "TRIM28"))
+
+#replace rownames from ensembl_id to gene name
+rownames(hmGeneCorrInput) <- gene.name$external_gene_name[match(rownames(hmGeneCorrInput), gene.name$ensembl_gene_id)]
+
+rownames(oranGeneCorrInput) <- gene.name$external_gene_name[
+  match(rownames(oranGeneCorrInput), gene.name$ensembl_gene_id)
+]
+
+# load TE data
+hmTECorrInput <- inputBundle$TECorrInputRef
+oranTECorrInput <- inputBundle$TECorrInputCompare
+
+# run correlation
+hmCorrResult <- corrOrthologTE(
+    geneInput = hmGeneCorrInput,
+    teInput = hmTECorrInput,
+    corrMethod = "pearson",
+    padjMethod = "fdr",
+    fileDir = "results/hmoran",
+    fileName = "hmCorrResult.csv"
+)
+oranCorrResult <- corrOrthologTE(
+  geneInput = oranGeneCorrInput,
+  teInput = oranTECorrInput,
+  corrMethod = "pearson",
+  padjMethod = "fdr",
+  fileDir = "results/hmoran",
+  fileName = "oranCorrResult.csv"
+)
+
+
+```
+
+```{r, eval=FALSE}
+# you can visualize the result with appTEKRABber
+# however, this function is only support when DE and correlation are both ID or name
+appDE <- hmoranDE
+appRef <- hmCorrResult
+appCompare <- oranCorrResult
+appMeta <- meta
+
+if (interactive()) {
+    appTEKRABber()
+}
+```
+
+

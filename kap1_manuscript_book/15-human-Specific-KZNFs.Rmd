@@ -1,0 +1,150 @@
+# Human specific KRAB-ZNFs
+
+Load package
+
+```{r}
+library(TEKRABber)
+library(twice)
+```
+
+We first load human kznfs reference data and human data:
+
+```{r}
+data("hmKZNFs337")
+hm <- read.csv("counts/hm_gene.csv")
+head(hm)
+```
+So, we have 8919 genes from human B cells data. We filter it with 337 KRAB-ZNFs 
+list and add common name.
+
+```{r}
+hm_kznfs <- merge(
+    hm, 
+    hmKZNFs337,
+    by.x = "gene",
+    by.y = "ensembl_gene_id"
+)
+
+head(hm_kznfs)
+```
+We found 81 human KRAB-ZNFs from our data. Then we try to calculate the 
+correlation between transposable elements. We first load human TE expression 
+data.
+
+```{r}
+hmTE <- read.csv("counts/hm_te.csv")
+head(hmTE)
+```
+We have **992 TEs** data and **81 KRAB-ZNFs** data. We prepared the data format
+ to analyze correlation.
+
+```{r}
+rownames(hm_kznfs) <- hm_kznfs$external_gene_name
+hmKZNFsInput <- hm_kznfs[,c(2,3,4)]
+
+rownames(hmTE) <- hmTE$name
+hmTEsInput <- hmTE[,c(4,5,6)]
+
+# use TEKRABber function
+hmCorrResult <- corrOrthologTE(
+    geneInput = hmKZNFsInput,
+    teInput = hmTEsInput,
+    corrMethod = "pearson",
+    padjMethod = "fdr"
+)
+
+write.table(hmCorrResult, file="hm_results/hmCorrResult81.csv", sep=",")
+```
+
+By using `TEKRABber::corrOrthologTE()`, we can obtain 81*992 result in 10 
+minutes. Then we investigate results and there are 295 rows of data.
+
+```{r}
+hmCorrResult.sig <- hmCorrResult[hmCorrResult$padj<0.05, ]
+hmCorrResult.sig <- na.omit(hmCorrResult.sig)
+print(paste0("there are ", nrow(hmCorrResult.sig), " rows of significant results"))
+
+```
+```{r}
+(unique(hmCorrResult.sig$geneName))
+(unique(hmCorrResult.sig$teName))
+```
+Let us see if there are positive and negative correlations.
+
+```{r}
+hmCorrResult.sig.positve <- hmCorrResult.sig[hmCorrResult.sig$coef>0, ]
+hmCorrResult.sig.negative <- hmCorrResult.sig[hmCorrResult.sig$coef<0, ]
+
+(paste0("There are ", nrow(hmCorrResult.sig.positve), " positive correlation"))
+(paste0("There are ", nrow(hmCorrResult.sig.negative), " negative correlation"))
+```
+Let's create a KRAB-ZNFs and TEs pairs table using `twice::kznfsTEsPairs()`
+```{r}
+data("hg19rmsk_info")
+hmkznfsTEsPairs <- kznfsTEsPairs(hmCorrResult.sig, hg19rmsk_info)
+```
+### Find and compare to KRAB-ZNFs to chimpanzee and orangutan  
+We first load data:
+
+```{r}
+hmchimpCorr <- read.csv("hmchimp_results/hmCorrResult.csv")
+hmchimpCorr.sig <- hmchimpCorr[hmchimpCorr$padj<0.05, ]
+hmchimpCorr.sig <- na.omit(hmchimpCorr.sig)
+head(hmchimpCorr.sig)
+```
+```{r}
+# data
+hm <- hmCorrResult.sig$geneName
+hmchimp <- hmchimpCorr.sig$geneName
+
+setdiff(hm, hmchimp)
+```
+
+```{r}
+#hmoran
+hm <- read.csv("hmoran_results/hmCorrResult.csv")
+hm <- hm[hm$padj < 0.05, ]
+hm <- na.omit(hm)
+hmoran <- unique(hm$geneName)
+(setdiff(hm, hmoran))
+
+oran <- read.csv("hmoran_results/oranCorrResult.csv")
+oran <- oran[oran$padj < 0.05, ]
+oran <- na.omit(oran)
+unique(oran$teName)
+```
+
+We try to compare to ortholog table referring to BioMat data
+```{r}
+library(biomaRt)
+
+speciesRef <- "hsapiens"
+speciesCompare <- "pabelii"
+geneRef <- paste0(speciesRef, "_gene_ensembl")
+geneCompare <- paste0(speciesCompare, "_gene_ensembl")
+orthologyRef <- paste0(speciesRef, "_homolog_orthology_confidence")
+
+ensemblRef <- biomaRt::useEnsembl("ensembl", dataset = geneRef, version = "105")
+ensemblCompare <- biomaRt::useEnsembl("ensembl", dataset = geneCompare, version = "105")
+
+orthologTable <- biomaRt::getLDS(
+    attributes = c(
+        "external_gene_name",
+        "chromosome_name",
+        "ensembl_gene_id",
+        "start_position",
+        "end_position"
+    ),
+    mart = ensemblRef,
+    attributesL = c(
+        "external_gene_name",
+        "ensembl_gene_id",
+        "start_position",
+        "end_position",
+        orthologyRef
+    ),
+    martL = ensemblCompare
+)
+
+```
+

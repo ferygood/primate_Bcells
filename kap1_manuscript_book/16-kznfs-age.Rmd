@@ -1,0 +1,41 @@
+# Age of KRAB-ZNFs
+
+```{r}
+library(twice)
+library(plotly)
+```
+```{r}
+data(hg38age)
+
+# hm expression
+dfhm <- read.csv("hm_results/hmCorrResult81.csv")
+
+# extract 81 kznfs
+znfs <- unique(dfhm$geneName)
+
+hg38age_znfs <- hg38age[hg38age$geneName %in% znfs,]
+
+```
+
+```{r}
+znfs_exclude <- dfhm[!('%in%'(dfhm$geneName, hg38age_znfs$geneName)),]
+# total 11 exlude KRAB-ZNFs not in GenTree data
+```
+
+#### is significant correlation of KZNFs are relatively young?
+```{r}
+dfhm.sig <- dfhm %>%
+    filter(pvalue < 0.05)
+
+znfs.sig <- unique(dfhm.sig$geneName)
+
+```
+
+#### human and chimpanzee
+```{r}
+hmchimp <- read.csv("hmchimp_results/hmCorrResult.csv")
+hmchimp_znfs <- unique(hmchimp$geneName)
+hmchimp_znfs_exclude <- dfhm[!('%in%'(dfhm$geneName, hmchimp_znfs)),]
+unique(hmchimp_znfs_exclude$geneName)
+```
+

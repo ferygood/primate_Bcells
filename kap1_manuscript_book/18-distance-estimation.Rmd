@@ -1,0 +1,179 @@
+# Distance estimattion
+
+In this analysis, we want to see if negative or positive correlation between KRAB-ZNFs and TEs are related to their distance on chromosome. We only can compare KRAB-ZNFs and TEs on the same chromosome.
+1. Extract positive/negative correlation pairs from human data
+2. Filter them from coordinates reference
+3. caculate distance and save results as a dataframe
+
+```{r}
+library(twice)
+library(dplyr)
+library(biomaRt)
+```
+
+
+### Extract positive / negative correlation pairs
+
+```{r}
+hmCorr <- read.csv("hm_results/hmCorrResult81.csv")
+hmCorr.sig <- hmCorr %>%
+    filter(padj < 0.05)
+hmCorr.sig$geneName[1]
+hmCorr.sig$teName[1]
+```
+### filter them from coordinates reference
+#### Load coordinate data
+You can find tutorial [here](http://grch37.ensembl.org/info/data/biomart/biomart_r_package.html)
+```{r}
+# get significant znfs and TEs name
+znfs <- unique(hmCorr.sig$geneName)
+tes <- unique(hmCorr.sig$teName)
+
+# get hg19 coordinates information
+grch37 <- useEnsembl(biomart = "ensembl", GRCh=37) 
+listDatasets(grch37)
+
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl", GRCh=37)
+
+ensembl_gene <- getBM(
+    attributes = c('ensembl_gene_id',
+                   'hgnc_symbol',
+                   'chromosome_name',
+                   'start_position',
+                   'end_position'),
+    mart = ensembl
+)
+
+
+# filter znfs
+ensembl_gene_znfs <- ensembl_gene[ensembl_gene$hgnc_symbol %in% znfs, ]
+ensembl_gene_znfs[42, "chromosome_name"] <- "19" #modified previous unknown result
+
+```
+
+#### Load TE coordinate
+
+we based on the chromosome number and te name from correlation result to filter some data
+```{r}
+data("hg19rmsk_gtf")
+
+chr_list <- unique(ensembl_gene_znfs$chromosome_name)
+
+#filter chromosome
+df_te <- hg19rmsk_gtf
+df_te$seqnames <- substr(df_te$seqnames, 4, length(df_te$seqnames)) # remove chr
+df_te <- df_te %>% 
+    filter(seqnames %in% chr_list) %>%
+    filter(gene_id %in% tes)
+
+```
+
+#### Now the input data are ready and we can now write algorithm
+```{r include=FALSE}
+# 1. iterate through chr number
+# 2. calculate mean value and decide which will be first and second
+# 4. calculate distance and add rows to dataframe
+
+# initialize an empty dataframe
+df <- data.frame(
+    Chr = character(),
+    KRAB_ZNFs = character(),
+    TEs = character(),
+    distance = numeric(),
+    pos_or_neg = character()
+)
+
+for (chr in chr_list){
+    
+    dfGene <- ensembl_gene_znfs[ensembl_gene_znfs$chromosome_name==chr, ]
+    dfTE <- df_te[df_te$seqnames==chr, ]
+    df_idx <- 0
+    
+    for (i in 1:nrow(dfGene)){
+        for (j in 1:nrow(dfTE)){
+
+            geneMean <- mean(c(dfGene$start_position[i], dfGene$end_position[i]))
+            teMean <- mean(c(dfTE$start[j], dfTE$end[j]))
+            dis <- 0
+            
+            # check if the data exist in the correlation table
+            check_status <- hmCorr.sig[
+                hmCorr.sig$geneName==dfGene$hgnc_symbol[i] &
+                    hmCorr.sig$teName==dfTE$gene_id[j],
+            ]
+            
+            if (nrow(check_status)>0) {
+
+                if (geneMean > teMean){
+                    dis <- dfGene$start_position[i] - dfTE$end[j]
+                } else {
+                    dis <- dfTE$start[j] - dfGene$end_position[i]
+                }
+
+                coef <- hmCorr.sig[hmCorr.sig$geneName==dfGene$hgnc_symbol[i] &
+                                       hmCorr.sig$teName==dfTE$gene_id[j], "coef"]
+                
+                coef_result <- ifelse(coef>0, "pos", "neg")
+                
+                df_idx <- df_idx + 1
+                df[df_idx, ] <- c(
+                    chr,
+                    dfGene$hgnc_symbol[i],
+                    dfTE$gene_id[j],
+                    dis,
+                    ifelse(coef>0, "pos", "neg")
+                )
+            }
+        }
+    }
+
+}
+
+df$distance <- as.numeric(df$distance)
+
+write.table(df, "hm_results/kznfsTEs_distance.csv", sep=",")
+```
+
+#### Visualize the results
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(hrbrthemes)
+library(viridis)
+```
+```{r}
+# ZNF782
+znf782 <- df %>%
+    filter(KRAB_ZNFs=="ZNF782") %>%
+    mutate(distance = log2(distance))
+
+p.znf782 <- znf782 %>%
+  ggplot( aes(x=distance, fill=pos_or_neg)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'identity') +
+    scale_fill_manual(values=c("#69b3a2", "#404080")) +
+    theme_ipsum() +
+    labs(fill="")
+
+p.znf782
+```
+
+
+
+```{r}
+ggplot(df, aes(x=KRAB_ZNFs, y=distance/1000000, fill=pos_or_neg)) +
+    geom_boxplot() +
+    theme_ipsum_tw(base_size=14) +
+    xlab("KRAB-ZNFs") +
+    ylab("distance(bp/1e+06)")
+```
+#### Density plot
+```{r}
+ggplot(df, aes(x=distance/1000000, group=pos_or_neg, fill=pos_or_neg)) +
+    geom_density(adjust=1.5, alpha=.4) +
+    theme_ipsum(
+        base_size = 16
+    ) + 
+    xlab("distance(bp/1e+06)")
+```
+

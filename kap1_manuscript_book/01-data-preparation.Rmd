@@ -1,0 +1,183 @@
+# Data preparation  
+The output of gene and TEs count tables are separated as individual, and we need 
+to combine tables based on species before running down-stream analysis. So we 
+will generate 6 tables, 3 gene tables (human, chimpanzee, orangutan) and 3 TE 
+tables (human, chimpanzee, orangutan). The R script of this chapter is in `01-data-preparation.Rmd`.
+
+```{r loading package}
+library(tidyverse)
+```
+
+## Combined 3 replicated gene count tables (human, chimpanzee, orangutan)
+we first combine the human gene count table to a same files.
+Then, we save the output file as `data/counts/hm_gene.csv`
+```{r create human gene table}
+# load data
+gm18558 <- read_table("data/genecount/GM18558_Zeb2_neg.featureCounts.jcounts")
+gm18960 <- read_table("data/genecount/GM18960_Zeb2_neg.featureCounts.jcounts")
+gm19240 <- read_table("data/genecount/GM19240_Zeb2_neg.featureCounts.jcounts")
+
+# remove gene name is NA, and select gene count
+gm18558 <- drop_na(gm18558[,c(1,9)])
+gm18960 <- drop_na(gm18960[,c(1,9)])
+gm19240 <- drop_na(gm19240[,c(1,9)])
+
+# merge and count mean
+gm18558 <- aggregate(gm18558[,2], list(gm18558$PrimaryGene), mean)
+gm18960 <- aggregate(gm18960[,2], list(gm18960$PrimaryGene), mean)
+gm19240 <- aggregate(gm19240[,2], list(gm19240$PrimaryGene), mean)
+
+hm.gene <- inner_join(gm18558, gm18960, by="Group.1")
+hm.gene <- inner_join(hm.gene, gm19240, by = "Group.1")
+colnames(hm.gene) <- c("gene", "GM18558", "GM18960", "GM19240")
+hm.gene <- hm.gene %>%
+  mutate(
+    GM18558 = round(GM18558), 
+    GM18960 = round(GM18960), 
+    GM19240 = round(GM19240)
+  )
+
+write.table(hm.gene, "data/counts/hm_gene.csv", sep=",")
+head(hm.gene)
+```
+
+Like previous human data, we combine three replicate chimpanzee gene count data
+as `data/counts/chimp_gene.csv`.
+```{r create chimpanzee gene table}
+# load data
+judith <- read_table("data/genecount/Chimp_Judith_Zeb2_neg.featureCounts.jcounts")
+leo <- read_table("data/genecount/Chimp_Leo_Zeb2_neg.featureCounts.jcounts")
+maryke <- read_table("data/genecount/Chimp_Maryke_Zeb2_neg.featureCounts.jcounts")
+
+# remove NA and select gene count
+judith <- drop_na(judith[,c(1,9)])
+leo <- drop_na(leo[,c(1,9)])
+maryke <- drop_na(maryke[,c(1,9)])
+
+# merge and count mean
+judith <- aggregate(judith[, 2], list(judith$PrimaryGene), mean)
+leo <- aggregate(leo[,2], list(leo$PrimaryGene), mean)
+maryke <- aggregate(maryke[,2], list(maryke$PrimaryGene), mean)
+
+chimp.gene <- inner_join(judith, leo, by="Group.1")
+chimp.gene <- inner_join(chimp.gene, maryke, by="Group.1")
+colnames(chimp.gene) <- c("gene", "Judith", "Leo", "Maryke")
+
+chimp.gene <- chimp.gene %>%
+  mutate(Judith = round(Judith), Leo = round(Leo), Maryke = round(Maryke)) %>%
+  mutate(gene = substr(gene, 1, 18)) # remove decimal ensembl id
+
+write.table(chimp.gene, "data/counts/chimp_gene.csv", sep=",")
+head(chimp.gene)
+```
+
+Combine three replicate orangutan gene count data as `data/counts/oran_gene.csv`.
+```{r create orangutan gene table}
+guchi <- read_table("data/genecount/Orang_Guchi_Zeb2_neg.featureCounts.jcounts")
+jaqo <- read_table("data/genecount/Orang_Jaqo_Zeb2_neg.featureCounts.jcounts")
+jingjing <- read_table("data/genecount/Orang_JingJing_Zeb2_neg.featureCounts.jcounts")
+
+# remove NA and select gene count
+guchi <- drop_na(guchi[,c(1,9)])
+jaqo <- drop_na(jaqo[,c(1,9)])
+jingjing <- drop_na(jingjing[,c(1,9)])
+
+# merge and count mean
+guchi <- aggregate(guchi[,2], list(guchi$PrimaryGene), mean)
+jaqo <- aggregate(jaqo[,2], list(jaqo$PrimaryGene), mean)
+jingjing <- aggregate(jingjing[,2], list(jingjing$PrimaryGene), mean)
+
+oran.gene <- inner_join(guchi, jaqo, by="Group.1")
+oran.gene <- inner_join(oran.gene, jingjing, by="Group.1")
+colnames(oran.gene) <- c("gene", "Guchi", "Jaqo", "Jingjing")
+
+oran.gene <- oran.gene %>%
+  mutate(
+    Guchi = round(Guchi),
+    Jaqo = round(Jaqo),
+    Jingjing = round(Jingjing),
+    gene = substr(gene, 1, 18)
+  )
+
+write.table(oran.gene, file = "data/counts/oran_gene.csv", sep=",")
+head(oran.gene)
+```
+
+## Combine transposable elements count tables (human, chimpanzee, orangutan) 
+Then we combine three TEs tables based on species as `data/counts/hm_te.csv`
+```{r create human TEs table}
+# human
+h1 <- read_table("data/tecount/GM18558_Zeb2_neg.cntTable")
+h2 <- read_table("data/tecount/GM18960_Zeb2_neg.cntTable")
+h3 <- read_table("data/tecount/GM19240_Zeb2_neg.cntTable")
+
+h1 <- h1[!grepl("ENSG", h1$`gene/TE`),]
+h2 <- h2[!grepl("ENSG", h2$`gene/TE`),]
+h3 <- h3[!grepl("ENSG", h3$`gene/TE`),]
+
+h1 <- h1 %>% separate(
+  `gene/TE`,
+  c("name", "family", "class"),
+  sep = ":"
+)
+colnames(h1)[4] <-"GM18558" 
+
+colnames(h2)[2] <- "GM18960"
+colnames(h3)[2] <- "GM19240"
+
+hm.te <- cbind(h1, h2[,2], h3[,2])
+write.table(hm.te, "data/counts/hm_te.csv", sep=",")
+head(hm.te)
+```
+
+Combine all chimpanzee transposable elements as `data/counts/chimp_te.csv`.
+```{r create chimpanzee TE table}
+c1 <- read_table("data/tecount/Chimp_Judith_Zeb2_neg.cntTable")
+c2 <- read_table("data/tecount/Chimp_Leo_Zeb2_neg.cntTable")
+c3 <- read_table("data/tecount/Chimp_Maryke_Zeb2_neg.cntTable")
+
+c1 <- c1[!grepl("ENS", c1$`gene/TE`),]
+c2 <- c2[!grepl("ENS", c2$`gene/TE`),]
+c3 <- c3[!grepl("ENS", c3$`gene/TE`),]
+
+c1 <- c1 %>% separate(
+  `gene/TE`,
+  c("name", "family", "class"),
+  sep = ":"
+)
+colnames(c1)[4] <-"Judith" 
+colnames(c2)[2] <- "Leo"
+colnames(c3)[2] <- "Maryke"
+
+chimp.te <- cbind(c1, c2[,2], c3[,2])
+chimp.te <- chimp.te[-1,]
+rownames(chimp.te) <- 1:1260
+write.table(chimp.te, "data/counts/chimp_te.csv", sep=",")
+head(chimp.te)
+```
+
+
+Combine orangutan transposable elements tables as `data/counts/oran_te.csv`.
+```{r create orangutan TE table}
+o1 <- read_table("data/tecount/Orang_Guchi_Zeb2_neg.cntTable")
+o2 <- read_table("data/tecount/Orang_Jaqo_Zeb2_neg.cntTable")
+o3 <- read_table("data/tecount/Orang_JingJing_Zeb2_neg.cntTable")
+
+o1 <- o1[!grepl("ENS", o1$`gene/TE`),]
+o2 <- o2[!grepl("ENS", o2$`gene/TE`),]
+o3 <- o3[!grepl("ENS", o3$`gene/TE`),]
+
+o1 <- o1 %>% separate(
+  `gene/TE`,
+  c("name", "family", "class"),
+  sep = ":"
+)
+colnames(o1)[4] <-"Guchi" 
+colnames(o2)[2] <- "Jaqo"
+colnames(o3)[2] <- "Jingjing"
+
+oran.te <- cbind(o1, o2[,2], o3[,2])
+write.table(oran.te, "data/counts/oran_te.csv", sep=",")
+head(oran.te)
+```
+
