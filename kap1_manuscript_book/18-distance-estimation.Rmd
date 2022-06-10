@@ -5,25 +5,23 @@ In this analysis, we want to see if negative or positive correlation between KRA
 2. Filter them from coordinates reference
 3. caculate distance and save results as a dataframe
 
-```{r}
+```{r, warning=FALSE}
 library(twice)
 library(dplyr)
 library(biomaRt)
 ```
 
 
-### Extract positive / negative correlation pairs
+Here we load the human only correlation results [path need to be updated when revising the book]
 
 ```{r}
-hmCorr <- read.csv("hm_results/hmCorrResult81.csv")
+hmCorr <- read.csv("../hm_results/hmCorrResult81.csv")
 hmCorr.sig <- hmCorr %>%
     filter(padj < 0.05)
 hmCorr.sig$geneName[1]
 hmCorr.sig$teName[1]
 ```
-### filter them from coordinates reference
-#### Load coordinate data
-You can find tutorial [here](http://grch37.ensembl.org/info/data/biomart/biomart_r_package.html)
+We then filter them from coordinates reference from biomart reference. You can find tutorial [here](http://grch37.ensembl.org/info/data/biomart/biomart_r_package.html)
 ```{r}
 # get significant znfs and TEs name
 znfs <- unique(hmCorr.sig$geneName)
@@ -51,9 +49,7 @@ ensembl_gene_znfs[42, "chromosome_name"] <- "19" #modified previous unknown resu
 
 ```
 
-#### Load TE coordinate
-
-we based on the chromosome number and te name from correlation result to filter some data
+We based on the chromosome number and te name from correlation result to filter some data
 ```{r}
 data("hg19rmsk_gtf")
 
@@ -68,7 +64,7 @@ df_te <- df_te %>%
 
 ```
 
-#### Now the input data are ready and we can now write algorithm
+The inputs are ready, and then we can write a algorithm to calculate their distance based on the same chromosome.
 ```{r include=FALSE}
 # 1. iterate through chr number
 # 2. calculate mean value and decide which will be first and second
@@ -142,6 +138,8 @@ library(dplyr)
 library(hrbrthemes)
 library(viridis)
 ```
+We can look at each ZNF genes separately. Here we use ZNF782 as example.
+
 ```{r}
 # ZNF782
 znf782 <- df %>%
@@ -161,13 +159,15 @@ p.znf782
 
 
 ```{r}
-ggplot(df, aes(x=KRAB_ZNFs, y=distance/1000000, fill=pos_or_neg)) +
-    geom_boxplot() +
-    theme_ipsum_tw(base_size=14) +
+p1 <- ggplot(df, aes(x=KRAB_ZNFs, y=distance/1000000, fill=pos_or_neg)) +
+    geom_boxplot(alpha=0.5) +
+    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    theme_ipsum_tw(base_size=8) +
     xlab("KRAB-ZNFs") +
     ylab("distance(bp/1e+06)")
 ```
-#### Density plot
+
+Density plot
 ```{r}
 ggplot(df, aes(x=distance/1000000, group=pos_or_neg, fill=pos_or_neg)) +
     geom_density(adjust=1.5, alpha=.4) +
@@ -175,5 +175,84 @@ ggplot(df, aes(x=distance/1000000, group=pos_or_neg, fill=pos_or_neg)) +
         base_size = 16
     ) + 
     xlab("distance(bp/1e+06)")
+```
+
+The next step, we try to visualize them using histogram and also combined with data that are not on the same chromosome.
+
+```{r}
+df %>%
+    ggplot(aes(x=distance/1000000, fill=pos_or_neg)) +
+    geom_histogram( color="#e9ecef", alpha=0.4, position = 'identity') +
+    #scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    theme_light()
+```
+
+
+```{r}
+df %>%
+    ggplot(aes(x=distance/1000000, fill=pos_or_neg)) +
+    geom_histogram( color="#e9ecef", alpha=0.4, position = 'identity', aes(y=log2(..count.. + 1))) +
+    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    theme_light()
+```
+
+```{r}
+p2 <- df %>%
+    ggplot(aes(x=distance/1000000, fill=pos_or_neg)) +
+    geom_histogram( color="#e9ecef", alpha=0.4, position = 'identity', aes(y=log2(..count.. + 1))) +
+    geom_density(aes(y=log2(..count.. + 1)), alpha=.3) +
+    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    theme_ipsum_tw(base_size=10)
+```
+
+Next, we try to investigate without considerate the distance. (1) We pick KZNFs-TEs pairs from the correlation tables (2) Calculate the number from TE reference (3) Remove 4038 data from our result. 
+Then we can get how many positive and negative result we have remain.
+```{r}
+# 1. select data
+hmCorr.sig$pos_or_neg <- ifelse(hmCorr.sig$coef>0, "pos", "neg")
+df_all <- hmCorr.sig[,c(1,2,6)]
+rownames(df_all) <- 1:nrow(df_all)
+
+# 2. calculate number from TE reference
+
+for (i in 1:nrow(df_all)){
+    te_name <- df_all$teName[i]
+    count <- nrow(hg19rmsk_gtf[hg19rmsk_gtf$gene_id==te_name, ])
+    df_all$count[i] <- count
+    
+}
+
+num_pos <- sum(df_all[df_all$pos_or_neg=="pos", "count"]) #94955
+num_neg <- sum(df_all[df_all$pos_or_neg=="neg", "count"]) #100167
+
+# 3.
+# from the distance data
+num_pos_dis <- nrow(df[df$pos_or_neg=="pos", ]) # 118
+num_neg_dis <- nrow(df[df$pos_or_neg=="neg", ]) # 3920
+
+df_remain <- data.frame(
+    type = factor(c("pos_same_chr", "neg_same_chr", "pos", "neg"), levels = c("pos_same_chr", "neg_same_chr", "pos", "neg")),
+    count = c(num_pos_dis, num_neg_dis, num_pos - num_pos_dis, num_neg - num_neg_dis),
+    pos_or_neg = c("pos", "neg", "pos", "neg")
+)
+
+p3 <- ggplot(data = df_remain, aes(x=type, y=log2(count+1), fill=pos_or_neg) )+
+    geom_bar(stat="identity", alpha=0.6, color="#e9ecef") + 
+    scale_fill_manual(values=c("#69b3a2", "#f5587f")) +
+    theme_ipsum_tw(base_size=8)
+    
+
+```
+
+```{r, warning=FALSE}
+library(ggpubr)
+figure <- ggarrange(
+    p1,p2,p3, 
+    ncol=3, 
+    nrow=1, 
+    legend = "bottom"
+)
+
+ggsave(figure, height=4, width=12, filename = "figures/distance.jpg", dpi=400, bg="white")
 ```
 
