@@ -127,7 +127,7 @@ for (chr in chr_list){
 
 df$distance <- as.numeric(df$distance)
 
-write.table(df, "hm_results/kznfsTEs_distance.csv", sep=",")
+write.table(df, "results/hm/kznfsTEs_distance.csv", sep=",")
 ```
 
 #### Visualize the results
@@ -161,7 +161,7 @@ p.znf782
 ```{r}
 p1 <- ggplot(df, aes(x=KRAB_ZNFs, y=distance/1000000, fill=pos_or_neg)) +
     geom_boxplot(alpha=0.5) +
-    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    scale_fill_manual(values=c("#69b3a2", "#f5587f")) +
     theme_ipsum_tw(base_size=8) +
     xlab("KRAB-ZNFs") +
     ylab("distance(bp/1e+06)")
@@ -171,6 +171,7 @@ Density plot
 ```{r}
 ggplot(df, aes(x=distance/1000000, group=pos_or_neg, fill=pos_or_neg)) +
     geom_density(adjust=1.5, alpha=.4) +
+    scale_fill_manual(values=c("#69b3a2", "#f5587f")) +
     theme_ipsum(
         base_size = 16
     ) + 
@@ -183,7 +184,7 @@ The next step, we try to visualize them using histogram and also combined with d
 df %>%
     ggplot(aes(x=distance/1000000, fill=pos_or_neg)) +
     geom_histogram( color="#e9ecef", alpha=0.4, position = 'identity') +
-    #scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    scale_fill_manual(values=c("#69b3a2", "#f5587f")) +
     theme_light()
 ```
 
@@ -192,7 +193,7 @@ df %>%
 df %>%
     ggplot(aes(x=distance/1000000, fill=pos_or_neg)) +
     geom_histogram( color="#e9ecef", alpha=0.4, position = 'identity', aes(y=log2(..count.. + 1))) +
-    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    scale_fill_manual(values=c("#69b3a2", "#f5587f")) +
     theme_light()
 ```
 
@@ -201,7 +202,7 @@ p2 <- df %>%
     ggplot(aes(x=distance/1000000, fill=pos_or_neg)) +
     geom_histogram( color="#e9ecef", alpha=0.4, position = 'identity', aes(y=log2(..count.. + 1))) +
     geom_density(aes(y=log2(..count.. + 1)), alpha=.3) +
-    scale_fill_manual(values=c("#f5587f", "#69b3a2")) +
+    scale_fill_manual(values=c("#69b3a2", "#f5587f")) +
     theme_ipsum_tw(base_size=10)
 ```
 
@@ -239,7 +240,8 @@ df_remain <- data.frame(
 p3 <- ggplot(data = df_remain, aes(x=type, y=log2(count+1), fill=pos_or_neg) )+
     geom_bar(stat="identity", alpha=0.6, color="#e9ecef") + 
     scale_fill_manual(values=c("#69b3a2", "#f5587f")) +
-    theme_ipsum_tw(base_size=8)
+    theme_ipsum_tw(base_size=10) +
+    theme(axis.text.x = element_text(angle = 45, hjust=1))
     
 
 ```
@@ -250,9 +252,58 @@ figure <- ggarrange(
     p1,p2,p3, 
     ncol=3, 
     nrow=1, 
-    legend = "bottom"
+    legend = "bottom",
+    labels = c("A", "B", "C")
 )
 
 ggsave(figure, height=4, width=12, filename = "figures/distance.jpg", dpi=400, bg="white")
+```
+This part, we called 'artifact' at the moment because we create rows with artifact KRAB-ZNFs and TEs for infinity distance. We add 94837 rows of positive correlation data and 96247 negative correlation data.
+
+```{r}
+# try to merge
+artifact_kznf_pos <- data.frame(
+    Chr=rep("X", 94837),
+    KRAB_ZNFs = rep("a_KZNF", 94837),
+    TEs = rep("a_TE", 94837),
+    distance = rep(228845445, 94837),
+    pos_or_neg = rep("pos", 94837)
+)
+
+artifact_kznf_neg <- data.frame(
+    Chr=rep("X", 96247),
+    KRAB_ZNFs = rep("b_KZNF", 96247),
+    TEs = rep("b_TE", 96247),
+    distance = rep(248845445, 96247),
+    pos_or_neg = rep("neg", 96247)
+)
+    
+
+df_artifact <- rbind(df, artifact_kznf_neg, artifact_kznf_pos)
+
+p4 <- df_artifact %>%
+    ggplot(aes(x=distance/1000000, fill=pos_or_neg)) +
+    geom_histogram( color="#e9ecef", alpha=0.4, position = 'identity', aes(y=log2(..count.. + 1))) +
+    scale_fill_manual(values=c("#69b3a2", "#f5587f")) +
+    theme_ipsum_tw(base_size=10)
+
+p5 <- df_artifact %>%
+    ggplot(aes(x=distance/1000000, fill=pos_or_neg)) +
+    geom_histogram( color="#e9ecef", alpha=0.4, position = 'identity', aes(y=log2(..count.. + 1))) +
+    geom_density(aes(y=log2(..count.. + 1)), alpha=.3) +
+    scale_fill_manual(values=c("#69b3a2", "#f5587f")) +
+    theme_ipsum_tw(base_size=10)
+
+
+figure_artifact <- ggarrange(
+    p4, p5, 
+    ncol=2, 
+    nrow=1, 
+    legend = "bottom",
+    labels = c("A", "B")
+)
+
+ggsave(figure_artifact, height=4, width=8, filename = "figures/distance_option.jpg", dpi=400, bg="white")
+
 ```
 
