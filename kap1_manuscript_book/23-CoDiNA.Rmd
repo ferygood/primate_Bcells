@@ -1,0 +1,81 @@
+# This script for running CoDiNA on our sample
+
+
+```{r}
+# pilot test
+library(dplyr)
+library(igraph)
+library(CoDiNA)
+```
+
+
+```{r}
+Nodes = LETTERS[1:10]
+Net1 = data.frame(Node.1 = sample(Nodes) , Node.2 = sample(Nodes), wTO = runif(10,-1,1))
+Net2 = data.frame(Node.1 = sample(Nodes) , Node.2 = sample(Nodes), wTO = runif(10,-1,1))
+Net3 = data.frame(Node.1 = sample(Nodes) , Node.2 = sample(Nodes), wTO = runif(10,-1,1))
+DiffNet = MakeDiffNet (Data = list(Net1,Net2,Net3), Code = c('Net1', 'Net2', 'Net3') )
+Graph = plot(x = DiffNet,
+layout = NULL, smooth.edges = TRUE,
+path = NULL, MakeGroups = FALSE, Cluster = FALSE,
+legend = TRUE, manipulation = FALSE, sort.by.Phi = FALSE)
+
+x = as.igraph(Graph)
+plot(x)
+```
+
+
+
+# You need to create three dataframe including first column KRAB-ZNFs, second column TE,
+# third column coefficient?
+
+```{r}
+# keyword: edge_attr(): width, title, color, phi, score.....
+# E(x)$width <- 1
+
+```
+
+```{r load data}
+hmCorr <- read.csv("../hm_results/hmCorrResult81.csv")
+chimpCorr <- read.csv("../hmchimp_results/chimpCorrResult.csv")
+oranCorr <- read.csv("../hmoran_results/oranCorrResult.csv")
+
+hmCorr.sig <- hmCorr %>% filter(padj < 0.05)
+chimpCorr.sig <- chimpCorr %>% filter(padj < 0.05)
+oranCorr.sig <- oranCorr %>% filter(padj < 0.05)
+```
+
+Use codina
+```{r use codina}
+
+DiffNetCorr = MakeDiffNet(
+    Data = list(hmCorr[,c(1,2,4)],chimpCorr[,c(1,2,4)],oranCorr[,c(1,2,4)]), 
+    Code = c('human', 'chimpanzee', 'orangutan'))
+
+# keep only nodes that are significantly 
+# steps: (1)filter by species (2)merge diffnet (3) remove duplicate rows
+
+DiffNetCorrAll <- DiffNetCorr 
+DiffNetCorrAll$merge <- paste0(DiffNetCorrAll$Node.1, DiffNetCorrAll$Node.2)
+
+hmCorr.sig$merge <- paste0(hmCorr.sig$teName, hmCorr.sig$geneName)
+hmDiffNet <- DiffNetCorrAll[DiffNetCorrAll$merge %in% hmCorr.sig$merge, ]
+
+chimpCorr.sig$merge <- paste0(chimpCorr.sig$teName, chimpCorr.sig$geneName)
+chimpDiffNet <- DiffNetCorrAll[DiffNetCorrAll$merge %in% chimpCorr.sig$merge]
+
+oranCorr.sig$merge <- paste0(oranCorr.sig$teName, oranCorr.sig$geneName)
+oranDiffNet <- DiffNetCorrAll[DiffNetCorrAll$merge %in% oranCorr.sig$merge]
+
+mergeDiffNet <- rbind(hmDiffNet, chimpDiffNet, oranDiffNet)
+mergeDiffNet <- mergeDiffNet[,-14]
+
+Graph = plot(x = mergeDiffNet,
+layout = NULL, smooth.edges = TRUE,
+path = NULL, MakeGroups = FALSE, Cluster = FALSE,
+legend = TRUE, manipulation = FALSE, sort.by.Phi = FALSE)
+
+x = as.igraph(Graph)
+plot(x)
+```
+

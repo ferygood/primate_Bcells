@@ -1,0 +1,56 @@
+### 21-Evolutionary-age-kznfs-TEs
+
+This part is going to classified "young" KRAB-ZNFs and TEs to see if their 
+expression are correlated (do our result support the arm-race model?). Previously 
+we have classified most of the KRAB-ZNFs referring to GenTree. We can then check 
+with the table from positive-selection paper (Vladi's and Melanie's paper). 
+
+From the result in `16-kznfs-age.Rmd`, we can see that there are 12 KRAB-ZNFs are not classified: ZNF419, ZNF337, ZNF331, ZNF614, ZNF528, ZNF160, ZNF519, ZNF250, 
+ZNF720, ZNF480, ZNF28, ZNF225.
+
+```{r}
+library(twice)
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+data("primateGRFs")
+
+kznfs12 <- c("ZNF419", "ZNF337", "ZNF331", "ZNF614", "ZNF528", "ZNF160", 
+             "ZNF519", "ZNF250", "ZNF720", "ZNF480", "ZNF28", "ZNF225")
+
+select_kznfs_grfs <- primateGRFs %>% filter(GeneName %in% kznfs12)
+```
+
+We visualize if all of the 12 krab-znfs present, or only some of the species has.
+
+```{r}
+select_kznfs_grfs %>% 
+    select(c(3:29)) %>%
+    summarise_all(list(~is.na(.))) %>%
+    pivot_longer(everything(), names_to="variables", values_to="missing") %>%
+    count(variables, missing) %>%
+    ggplot(aes(y=variables, x=n, fill=missing)) + 
+    geom_col()
+```
+
+We try to visualize the result using heatmap. Converting NA to 0 and exist to 1.
+
+```{r}
+df2 <- select_kznfs_grfs %>% 
+    select(c(3:29)) %>%
+    summarise_all(list(~is.na(.))) %>%
+    mutate_if(is.logical, as.numeric) 
+
+df2t <- t(df2)
+colnames(df2t) <- select_kznfs_grfs$GeneName
+df2t <- as.data.frame(df2t) %>%
+    mutate(score = rowSums(across(where(is.numeric))))
+heatmap(as.matrix(df2t))
+```
+1. We can separate KRAB-ZNFs to 9 classes (8 from GenTree, 1 from primateGRFs)
+2. Then separate TEs to 3 group 
+
+
+

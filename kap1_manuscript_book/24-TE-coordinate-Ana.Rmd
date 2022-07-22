@@ -1,0 +1,102 @@
+# Jul 21 2022
+# Subset of coordinates
+
+In this file, I will select the coordinates and send them to Ana to do the analysis again.
+(1) Subset only the information from hg19, panTro4, ponAbe2 ensGene and rmsk file.
+(2) Subsets the name of gene and TEs from TEKRABber result (p-value < 0.05)
+(3) Generate 3 tables including column: KZNFs, TEs, TE_coordinates
+
+```{r load TE references, eval=FALSE}
+library(dplyr)
+library(twice)
+
+# create TE filter and name list
+data("hg19rmsk_info")
+te_list <- c("SINE", "DNA", "LTR", "LINE", "SVA")
+hg19rmsk_info <- hg19rmsk_info[hg19rmsk_info$class_id %in% te_list, ] #908
+te_name <- hg19rmsk_info$gene_id
+```
+
+```{r}
+# gtf reference
+hg19rmskgtf <- rtracklayer::import("../../hg19_rmsk_TE.gtf")
+hg19rmsk <- Repitools::annoGR2DF(hg19rmskgtf)
+hg19rmskTable <- hg19rmsk[, c("gene_id", "chr", "start", "end")]
+
+```
+
+
+Load TEKRABber correlation result
+```{r}
+# human
+hmCorr <- read.csv("../hm_results/hmCorrResult81.csv")
+hmChimpCorr <- read.csv("../hmchimp_results/hmCorrResult.csv")
+hmOranCorr <- read.csv("../hmoran_results/hmCorrResult.csv")
+
+hmData <- rbind(hmCorr, hmChimpCorr, hmOranCorr)
+# remove NA
+hmData <- na.omit(hmData)
+# only name in TE name
+hmData <- hmData[hmData$teName %in% te_name, ]
+hmData.sig <- hmData[hmData$pvalue<0.05, ]
+```
+
+Merge KZNFs, TEs with TE coordinate (from gtf file)
+```{r}
+df <- right_join(hmData.sig[,c(1,2)], hg19rmskTable, by=c("teName" = "gene_id"))
+df <- na.omit(df)
+write.table(df, file = "results/coordinates/hmKZNFsTEsCorrd.csv", sep=",")
+```
+
+
+```{r}
+te_coordinate_table <- function(gtf, corr) {
+    
+    te_class <- c("SINE", "DNA", "LTR", "LINE", "SVA")
+    
+    #load gtf
+    df.gtf <- rtracklayer::import(gtf)
+    df.rmsk <- Repitools::annoGR2DF(df.gtf)
+    df.rmsk.table <- df.rmsk[, c("gene_id", "chr", "start", "end")]
+    
+    #load correlation result
+    df.corr <- read.csv(corr)
+    df.data <- na.omit(df.corr) # remove NA
+    df.data <- df.data[df.data$teName %in% te_name, ] # te_name need to generate by user
+    df.data.sig <- df.data[df.data$pvalue<0.05, ]
+    
+    #merge
+    df <- dplyr::right_join(
+        df.data.sig[,c(1,2)], 
+        df.rmsk.table, 
+        by=c("teName" = "gene_id"))
+    df <- na.omit(df)
+    df
+}
+```
+
+```{r}
+# chimpanzee
+chimpTEgtf <- "~/Downloads/panTro6_rmsk_TE.gtf"
+chimpCorr <- "../hmchimp_results/chimpCorrResult.csv"
+
+df.chimp <- te_coordinate_table(chimpTEgtf, chimpCorr)
+```
+
+```{r}
+# orangutan
+oranTEgtf <- "~/Downloads/ponAbe3_rmsk_TE.gtf"
+oranCorr <- "../hmoran_results/oranCorrResult.csv"
+
+df.oran <- te_coordinate_table(oranTEgtf, oranCorr)
+```
+
+```{r}
+# save as rds file
+hmKZNFsTEsCorrd <- df
+chimpKZNFsTEsCorrd <- df.chimp
+oranKZNFsTEsCorrd <- df.oran
+
+save(hmKZNFsTEsCorrd, chimpKZNFsTEsCorrd, oranKZNFsTEsCorrd, file="results/coordinates/kznfs_TEs_coordinate.RData")
+```
+

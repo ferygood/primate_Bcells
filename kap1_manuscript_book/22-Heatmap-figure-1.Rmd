@@ -1,0 +1,319 @@
+# Heatmap (first figure with differentially expressed results)  
+Date: June, 29, 2022
+This script is to create the first differentially expressed heatmap in the kap1 
+paper. 
+
+
+The first step we load libraries and data
+```{r loading libraries}
+# library
+library(twice)
+library(plyr)
+library(dplyr)
+library(ComplexHeatmap)
+library(circlize)
+library(ggplotify)
+library(ggpubr)
+```
+
+Load gene expression data, including the normalized human&chimpanzee and human&orangutan, 
+and human KRAB-ZNFs gene name and ID data.
+```{r load genomic data}
+# data
+hmchimp <- read.csv("results/hmchimp/geneDESeq2norm.csv")
+hmoran <- read.csv("results/hmoran/geneDESeq2norm.csv")
+data(hmKZNFs337)
+```
+
+First, we construct the KRAB-ZNFs. Filter only KRAB-ZNFs exist at least in two 
+species including human.
+```{r filtering kznfs data}
+hmchimp <- hmchimp[rownames(hmchimp)%in%hmKZNFs337$ensembl_gene_id,]
+hmoran <- hmoran[rownames(hmoran) %in% hmKZNFs337$ensembl_gene_id,]
+
+# create a column ensembl_id to merge data and rename rownames
+hmchimp$ensembl_id <- rownames(hmchimp)
+hmoran$ensembl_id <- rownames(hmoran)
+
+dfkznfs <- full_join(hmchimp, hmoran, by="ensembl_id", keep=TRUE)
+dfkznfs[c(40:43), c(1,2,3)] <- dfkznfs[c(40:43), c(8:10)]
+rownames(dfkznfs)[c(1:39)] <- dfkznfs[c(1:39),7]
+rownames(dfkznfs)[c(40:43)] <- dfkznfs[c(40:43), 14]
+dfkznfs <- dfkznfs[, -c(7,8,9,10,14)] # remove ensembl id column and extra human column
+```
+
+Bind all three species sample together to create input dataframe `dfkznfs`. 
+`dfkznfs` includes the log expression of KRAB-ZNFs overlapped at least two 
+speceis. We also rename the column name with abbreviation. 
+```{r create input dataframe for kznfs heatmap}
+colnames(dfkznfs) <- c("H1", "H2", "H3", "C1", "C2", "C3", "O1", "O2", "O3")
+```
+
+```{r convert ensid to gene name using twice package}
+dfkznfs <- ensIDtoName(dfkznfs)
+```
+
+```{r normalize expression to log scale}
+dfkznfslog <- as.matrix(log(dfkznfs))
+
+dfkznfslog_sort <- dfkznfslog[names(sort(rowSums(is.na(dfkznfslog)))), ]
+
+# try to create an unified color function
+# hexa color: colorhexa.com
+col_fun_znfs = colorRamp2(
+    c(0,2,4),
+    c("#776de7","white", "#ea3547")
+)
+
+deKZNFs_heatmap <- Heatmap(dfkznfslog_sort, 
+        na_col = "grey", 
+        cluster_rows = FALSE, 
+        cluster_columns = FALSE,
+        width = ncol(dfkznfslog) * unit(4, "mm"),
+        height = nrow(dfkznfslog) * unit(4, "mm"),
+        column_names_rot = 45,
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 8),
+        rect_gp = gpar(col = "black", lwd=0.8),
+        name="exp",
+        col = col_fun_znfs
+)
+
+tidyHeatmap::save_pdf(deKZNFs_heatmap, filename="figures/deKZNFs.pdf", width = 8.27, height=11.69)
+
+```
+
+
+Second, we prepare the dataset of transposable elements (TEs). First we also 
+loading the differentially results and filter it with `padj<0.05` and `absolute log2 fold -change > 1.2`. 
+```{r loading TEs data}
+# select de genes in human vs. chimpanzee
+hmchimpTEres <- read.csv("results/hmchimp/teDESeq2results.csv")
+
+hmchimpTEres_de <- hmchimpTEres %>% 
+    filter(padj < 0.05) %>%
+    filter(abs(log2FoldChange) > 1.2)
+hmchimpTEres_de_list <- rownames(hmchimpTEres_de)
+
+# select de genes in human vs. orangutans
+hmoranTEres <- read.csv("results/hmoran/teDESeq2results.csv")
+hmoranTEres_de <- hmoranTEres %>%
+    filter(padj < 0.05) %>%
+    filter(abs(log2FoldChange) > 1.2)
+hmoranTEres_de_list <- rownames(hmoranTEres_de)
+
+# combined data
+te_list <- intersect(hmchimpTEres_de_list, hmoranTEres_de_list)
+```
+
+However we previous include other repeats except DNA, LINE, SINE, SVA and LTR, 
+therefore we need to remove them. This will need the annotation data.
+```{r remove other repeats}
+data("hg19rmsk_info")
+te_comfirm_list <- hg19rmsk_info[hg19rmsk_info$class_id %in% c("DNA", "LINE", "SINE", "SVA", "LTR"), ]
+
+te_list <- intersect(te_list, te_comfirm_list$gene_id) #88
+```
+
+We now have the the differentially expressed list. We then use this list to filter the expression data. The input data frame is generated as `dfTE`. Then we separate heatmap based on group.
+```{r load TE expression data and filter DE TEs}
+hmchimpTE <- read.csv("results/hmchimp/teDESeq2norm.csv")
+hmoranTE <- read.csv("results/hmoran/teDESeq2norm.csv")
+
+dfTE <- merge(hmchimpTE, hmoranTE[,c(4,5,6)], by = "row.names", all = FALSE)
+rownames(dfTE) <- dfTE$Row.names
+dfTE <- dfTE[,-1] # remove row.names column
+
+dfTE <- dfTE[rownames(dfTE) %in% te_list,]
+colnames(dfTE) <- c("H1", "H2", "H3", "C1", "C2", "C3", "O1", "O2", "O3")
+
+dfTElog <- as.matrix(log(dfTE + 1))
+```
+
+```{r define TE class and color code}
+# TE classes
+DNA <- te_comfirm_list[te_comfirm_list$class_id=="DNA", ]
+LINE <- te_comfirm_list[te_comfirm_list$class_id=="LINE", ]
+SINE <- te_comfirm_list[te_comfirm_list$class_id=="SINE", ]
+SVA <- te_comfirm_list[te_comfirm_list$class_id=="SVA", ]
+LTR <- te_comfirm_list[te_comfirm_list$class_id=="LTR", ]
+
+
+col_fun_TE <- colorRamp2(
+    c(0, 5, 10),
+    c("#776de7","white","#e81e32")
+)
+
+```
+
+
+Customized DNA transposon. 
+```{r customize DNA}
+
+# define row annotation
+DNA_ha <- rowAnnotation(
+    family = DNA[DNA$gene_id %in% rownames(dfTElog[rownames(dfTElog) %in% DNA$gene_id, ]), ]$family_id, 
+    class = rep("DNA", 14),
+    col = list(
+        class = c(
+            "DNA" = "#f5b7b1"
+        ),
+        family = c(
+            "TcMar-Mariner" = "#b88e8a",
+            "TcMar-Tigger" = "#805a57",
+            "TcMar-Tc2" = "#663a36",
+            "hAT-Charlie" = "#de695d",
+            "MuDR" = "#ad271a",
+            "DNA" = "#691912",
+            "TcMar" = "#ed3a28",
+            "PiggyBac" = "#f5685b"
+
+        )
+    ), show_annotation_name=FALSE
+)
+
+DNA_id_list <- DNA[DNA$gene_id %in% rownames(dfTElog[rownames(dfTElog) %in% DNA$gene_id, ]), ]$gene_id
+
+
+# create heatmap
+h_DNA <- Heatmap(dfTElog[DNA_id_list, ],
+              right_annotation = DNA_ha,
+              name = "exp",
+              cluster_rows = TRUE,
+              cluster_columns = FALSE,
+              col = col_fun_TE,
+              width = ncol(dfTElog[DNA_id_list, ]) * unit(4, "mm"),
+              height = nrow(dfTElog[DNA_id_list, ]) * unit(4, "mm"),
+              column_names_rot = 45,
+              row_names_gp = gpar(fontsize = 8),
+              column_names_gp = gpar(fontsize = 8),
+              rect_gp = gpar(col = "black", lwd=0.8)
+)
+
+
+```
+
+Customized LINE transposon expression.
+```{r customize LINE}
+# define row annotation
+LINE_ha <- rowAnnotation(
+    family = LINE[LINE$gene_id %in% rownames(dfTElog[rownames(dfTElog) %in% LINE$gene_id, ]), ]$family_id, 
+    class = rep("LINE", 14),
+    col = list(
+        class = c(
+            "LINE" = "#d7bde2"
+        ),
+        family = c(
+            "L1" = "#c385de",
+            "CR1" = "#b157d9"
+
+        )
+    ), show_annotation_name=FALSE
+)
+
+LINE_id_list <- LINE[LINE$gene_id %in% rownames(dfTElog[rownames(dfTElog) %in% LINE$gene_id, ]), ]$gene_id
+
+
+# create heatmap
+h_LINE <- Heatmap(dfTElog[LINE_id_list, ],
+              right_annotation = LINE_ha,
+              name = "exp",
+              cluster_rows = TRUE,
+              cluster_columns = FALSE,
+              col = col_fun_TE,
+              width = ncol(dfTElog[LINE_id_list, ]) * unit(4, "mm"),
+              height = nrow(dfTElog[LINE_id_list, ]) * unit(4, "mm"),
+              column_names_rot = 45,
+              row_names_gp = gpar(fontsize = 8),
+              column_names_gp = gpar(fontsize = 8),
+              rect_gp = gpar(col = "black", lwd=0.8)
+)
+
+```
+
+
+
+Customized SINE transposon expression. 
+```{r customize SINE&SVA}
+#col_fun = colorRamp2(c(-2, 0, 15), c("green", "white", "red"))
+
+# define row annotation
+SINE_SVA_ha <- rowAnnotation(
+    family = c("Alu", "Alu", "Alu", "SVA_D"),
+    class = c("SINE", "SINE", "SINE", "SVA"),
+    col = list(
+        class=c("SVA" = "#a3e4d7", "SINE" = "#a9cce3"),
+        family=c("SVA_D" = "#3de0c0", "Alu" = "#6aadd9")), 
+    show_annotation_name=FALSE
+)
+
+df_SINE_SVA <- dfTElog[rownames(dfTElog) %in% c(SINE$gene_id, SVA$gene_id), ] 
+
+h_SINE_SVA <- Heatmap(df_SINE_SVA,
+                 name="exp",
+                 right_annotation = SINE_SVA_ha,
+                 cluster_rows = TRUE,
+                 cluster_columns = FALSE,
+                 col = col_fun_TE,
+                 width = ncol(dfTElog[rownames(dfTElog) %in% 
+                                          c(SINE$gene_id, SVA$gene_id), ]) * unit(4, "mm"),
+                 height = nrow(dfTElog[rownames(dfTElog) %in% 
+                                           c(SINE$gene_id, SVA$gene_id), ]) * unit(4, "mm"),
+                 column_names_rot = 45,
+                 row_names_gp = gpar(fontsize = 8),
+                 column_names_gp = gpar(fontsize = 8),
+                 rect_gp = gpar(col = "black", lwd=0.8),
+              
+)
+
+```
+
+
+```{r customize LTR}
+LTR_ha <- rowAnnotation(
+    family = LTR[LTR$gene_id %in% rownames(dfTElog[rownames(dfTElog) %in% LTR$gene_id, ]), ]$family_id, 
+    class = rep("LTR", 56),
+    col = list(
+        class = c(
+            "LTR" = "#f9e79f"
+        ),
+        family = c(
+            "ERVL-MaLR" = "#f2da77",
+            "ERV1" = "#ada274",
+            "ERVL" = "#e6b909",
+            "Gypsy" = "#998122",
+            "ERVK" = "#8a7007"
+
+        )
+    ), show_annotation_name=FALSE
+)
+
+LTR_id_list <- LTR[LTR$gene_id %in% rownames(dfTElog[rownames(dfTElog) %in% LTR$gene_id, ]), ]$gene_id
+
+
+# create heatmap
+h_LTR <- Heatmap(dfTElog[LTR_id_list, ],
+              right_annotation = LTR_ha,
+              name = "exp",
+              cluster_rows = TRUE,
+              cluster_columns = FALSE,
+              col = col_fun_TE,
+              width = ncol(dfTElog[LTR_id_list, ]) * unit(4, "mm"),
+              height = nrow(dfTElog[LTR_id_list, ]) * unit(4, "mm"),
+              column_names_rot = 45,
+              row_names_gp = gpar(fontsize = 8),
+              column_names_gp = gpar(fontsize = 8),
+              rect_gp = gpar(col = "black", lwd=0.8)
+)
+
+
+```
+
+Combine heatmap and save files
+```{r}
+h_list <- h_DNA %v% h_LINE %v% h_SINE_SVA # use RStudio to save file
+
+tidyHeatmap::save_pdf(h_LTR, "figures/TE_LTR.pdf", width = 8.27, height=11.69)
+
+```
+

@@ -1,0 +1,80 @@
+# TE expression investigation
+
+In this part, we want to see if the expression of TEs that are negative correlated to 
+KRAB-ZNFs actually lower than positive ones. First we import the data we need: expression data, correlation data.
+
+```{r, warning=FALSE, message=FALSE}
+# load library
+library(twice)
+library(dplyr)
+```
+
+```{r}
+# expression data
+hm_TE <- read.csv("data/counts/hm_te.csv")
+
+# correlation data
+hmCorr <- read.csv("../hm_results/hmCorrResult81.csv")
+hmCorr.sig <- hmCorr %>%
+    filter(padj < 0.05)
+
+# filter TE name with positive or negative correlation
+te_pos <- hmCorr.sig[hmCorr.sig$coef>0, ] #117 rows of data
+te_neg <- hmCorr.sig[hmCorr.sig$coef<0, ] #178 rows of data
+
+# unique number of TE
+length(unique(te_pos$teName)) #86
+length(unique(te_neg$teName)) #76
+```
+From above, we have 117 KRAB-ZNFs-TEs significant positive correlations and 178 KRAB-ZNFs-TEs significant negative correlations from our correlation result obtained from TEKRABber.
+From the filtering result, there are 86 TEs found in positive group and 76 TEs found in negative group. The next step is to select these TEs from expression dataset.
+
+```{r}
+hm_TE <- hm_TE %>%
+    mutate(mean = c(GM18558 + GM18960 + GM19240)/3)
+
+# filter data from expression table
+hm_TE_pos <- hm_TE[hm_TE$name %in% te_pos$teName, ]
+hm_TE_neg <- hm_TE[hm_TE$name %in% te_neg$teName, ]
+
+# add label
+hm_TE_pos$label <- "pos"
+hm_TE_neg$label <- "neg"
+hm_TE_combine <- rbind(hm_TE_neg, hm_TE_pos)
+
+# visualization by their mean expression
+ggplot(hm_TE_combine, aes(x=log(mean), fill=label)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position='identity') +
+    scale_fill_manual(values=c("#69b3a2", "#f5587f"))
+
+```
+```{r}
+# ANOVA
+res.aov <- aov(mean ~ label, data=hm_TE_combine)
+print("ANOVA")
+print(summary(res.aov))
+
+# pairwise t-test, calculate pairwise comparisons between group levels with 
+# corrections for multiple testing
+print("Pairwise T-test")
+pairwise.t.test(hm_TE_combine$mean, hm_TE_combine$label)
+```
+So unfortunately, there is no significance that the expression of negative correlated 
+TE has lower expression than positive one. However, let's try to take out the "outlier" from our data.
+```{r}
+hm_TE_combine_filter <- hm_TE_combine %>%
+    filter(mean < 6900)
+
+# ANOVA
+res.aov <- aov(mean ~ label, data=hm_TE_combine_filter)
+print("ANOVA")
+print(summary(res.aov))
+
+# pairwise t-test, calculate pairwise comparisons between group levels with 
+# corrections for multiple testing
+print("Pairwise T-test")
+pairwise.t.test(hm_TE_combine_filter$mean, hm_TE_combine_filter$label)
+```
+Okay, after testing with filtering out really large expression count, we still 
+can not obtain significant result. Maybe the expression will elevate when they 
+are not repress by KRAB-ZNFs.
