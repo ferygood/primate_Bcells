@@ -1,9 +1,4 @@
----
-title: "Enrichment analysis"
-author: "yao"
-date: "5/3/2022"
-output: html_document
----
+# Enrichment analysis human and orangutan
 
 ```{r}
 library(clusterProfiler)
@@ -15,9 +10,9 @@ library(org.Hs.eg.db)
 
 Preparing Data:
 a csv file containing a list of gene names and log2 fold change values.
-We first try to analyze human and chimpanzee:
+We first try to analyze human and orangutan:
 ```{r}
-dfhmchimp <- read.csv("hmchimp_results/geneDESeq2results.csv")
+dfhmchimp <- read.csv("hmoran_results/geneDESeq2results.csv")
 
 # we want the log2 fold change
 original_gene_list <- dfhmchimp$log2FoldChange
@@ -48,6 +43,8 @@ gse <- gseGO(geneList = gene_list,
              OrgDb = "org.Hs.eg.db",
              pAdjustMethod = "none")
 ```
+
+
 ```{r}
 require(DOSE)
 

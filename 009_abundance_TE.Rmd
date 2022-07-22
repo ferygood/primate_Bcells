@@ -1,9 +1,4 @@
----
-title: "009_abundance_TE"
-author: "yao"
-date: "4/20/2022"
-output: html_document
----
+# Abundance TEs
 
 Here we calculate the average abundance of transposable elements:
 

@@ -5,7 +5,8 @@ library(ggplot2)
 library(ggpubr)
 theme_set(
     theme_classic() +
-        theme(legend.position="top")
+        theme(legend.position="top") +
+        theme(legend.title=element_blank())
 )
 ```
 
@@ -14,7 +15,7 @@ theme_set(
 dfhmchimp <- data.frame(
     corr=c(rep(c("positive", "negative"), 2)),
     species = factor(c("H", "H", "C", "C"), levels=c("H", "C")), 
-    pairs=c(73, 101, 109, 46)
+    pairs=c(55, 71, 84, 24)
 )
 
 (dfhmchimp)
@@ -23,7 +24,7 @@ dfhmchimp <- data.frame(
 p1 <- ggplot(dfhmchimp, aes(x=species, y=pairs)) +
     geom_col(aes(color=corr, fill=corr), position=position_dodge(0.8), width=0.7) +
     scale_fill_manual(values = c("#9999FF", "#FF6666")) +
-    scale_color_manual(values = c("#9999FF", "#FF6666"))
+    scale_color_manual(values = c("#9999FF", "#FF6666")) 
 
 p1 <- p1 + geom_text(
     aes(label = pairs, group = corr),
@@ -38,7 +39,7 @@ p1
 dfhmoran <- data.frame(
     corr=c(rep(c("positive", "negative"), 2)),
     species = c("H", "H", "O", "O"), 
-    pairs=c(7, 16, 68, 62)
+    pairs=c(5, 12, 49, 43)
 )
 
 (dfhmoran)

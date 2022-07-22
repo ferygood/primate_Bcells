@@ -1,9 +1,4 @@
----
-title: "016_human_Specific_KZNFs"
-author: "yao"
-date: "5/4/2022"
-output: html_document
----
+# Human specific KRAB-ZNFs
 
 Load package
 

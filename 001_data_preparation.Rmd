@@ -1,13 +1,10 @@
----
-title: "data_preparation"
-output: html_document
----
+# Data preparation
 
 ```{r}
 library(tidyverse)
 ```
 
-### 1 Combined human data and create gene table
+## 1 Combined human data and create gene table
 ```{r create human gene table}
 # load data
 gm18558 <- read_table("genecount/GM18558_Zeb2_neg.featureCounts.jcounts")
@@ -37,7 +34,7 @@ hm.gene <- hm.gene %>%
 write.table(hm.gene, "counts/hm_gene.csv", sep=",")
 ```
 
-### 2 combined chimpanzee data and create gene table
+## 2 combined chimpanzee data and create gene table
 ```{r create chimpanzee table}
 # load data
 judith <- read_table("genecount/Chimp_Judith_Zeb2_neg.featureCounts.jcounts")
@@ -65,7 +62,7 @@ chimp.gene <- chimp.gene %>%
 write.table(chimp.gene, "counts/chimp_gene.csv", sep=",")
 ```
 
-### 3 combined orangutans data and create gene table
+## 3 combined orangutans data and create gene table
 ```{r}
 guchi <- read_table("genecount/Orang_Guchi_Zeb2_neg.featureCounts.jcounts")
 jaqo <- read_table("genecount/Orang_Jaqo_Zeb2_neg.featureCounts.jcounts")
@@ -97,7 +94,7 @@ write.table(oran.gene, file = "counts/oran_gene.csv", sep=",")
 
 ```
 
-### 4. Human TE data
+## 4. Human TE data
 ```{r}
 h1 <- read_table("tecount/GM18558_Zeb2_neg.cntTable")
 h2 <- read_table("tecount/GM18960_Zeb2_neg.cntTable")
@@ -121,7 +118,7 @@ hm.te <- cbind(h1, h2[,2], h3[,2])
 write.table(hm.te, "counts/hm_te.csv", sep=",")
 ```
 
-### 5. Chimpanzee TE data
+## 5. Chimpanzee TE data
 ```{r}
 c1 <- read_table("tecount/Chimp_Judith_Zeb2_neg.cntTable")
 c2 <- read_table("tecount/Chimp_Leo_Zeb2_neg.cntTable")
@@ -147,7 +144,7 @@ write.table(chimp.te, "counts/chimp_te.csv", sep=",")
 ```
 
 
-### 6. Orangutan TE data
+## 6. Orangutan TE data
 ```{r}
 o1 <- read_table("tecount/Orang_Guchi_Zeb2_neg.cntTable")
 o2 <- read_table("tecount/Orang_Jaqo_Zeb2_neg.cntTable")

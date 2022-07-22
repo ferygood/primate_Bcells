@@ -1,7 +1,4 @@
----
-title: "intersection analysis"
-output: html_document
----
+# ChIP-seq-JASPAR-TEKRABber
 
 ### Data Information
 The input tables are corrdinates information of KRAB-ZNFs and TEs based on 

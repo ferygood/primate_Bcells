@@ -1,9 +1,5 @@
----
-title: "008_Hierarchical_clustering"
-author: "yao"
-date: "4/12/2022"
-output: html_document
----
+# Hierarchical clustering
+
 Load `twice` and other libraries. You need to load `plyr` first and then 
 `dplyr` to avoid conflict.
 

@@ -260,7 +260,7 @@ ggsave(figure, height=4, width=12, filename = "figures/distance.jpg", dpi=400, b
 ```
 This part, we called 'artifact' at the moment because we create rows with artifact KRAB-ZNFs and TEs for infinity distance. We add 94837 rows of positive correlation data and 96247 negative correlation data.
 
-```{r}
+```{r warning=FALSE}
 # try to merge
 artifact_kznf_pos <- data.frame(
     Chr=rep("X", 94837),

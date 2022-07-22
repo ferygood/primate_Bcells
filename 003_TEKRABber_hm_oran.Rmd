@@ -1,7 +1,4 @@
----
-title: "TEKRABber_hm_oran"
-output: html_document
----
+# TEKRABber human and orangutan
 
 ```{r}
 library(TEKRABber)

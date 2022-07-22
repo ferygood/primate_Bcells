@@ -91,15 +91,18 @@ resolution in each family.
 ```{r}
 data(hg19rmsk_info)
 
-hg19rmsk_de <- hg19rmsk_info[hg19rmsk_info$gene_id %in% te_list, ]
-
+#hg19rmsk_de <- hg19rmsk_info[hg19rmsk_info$gene_id %in% te_list, ]
+hg19rmsk_de <- hg19rmsk_info[hg19rmsk_info$class_id %in% c("DNA", "LINE", "SINE", "SVA", "LTR", "Other"), ]
+hg19rmsk_de$class_id[hg19rmsk_de$class_id == "Other"] <- "SVA"
+hg19rmsk_de <- hg19rmsk_de[hg19rmsk_de$gene_id %in% te_list, ]
 ```
 
 Create transposable elements class lists to filter data. Here we separate to 
 LTR and non-LTR because LTR has 56 rows and the others are total 39 rows
 ```{r}
 hg19_LTR_de <- hg19rmsk_de[hg19rmsk_de$class_id == "LTR", ] #56
-hg19_non_LTR_de <- hg19rmsk_de[hg19rmsk_de$class_id != "LTR", ] #39
+hg19_non_LTR_de <- hg19rmsk_de[hg19rmsk_de$class_id %in% c("LINE", "SINE", "SVA"), ] #18
+hg19_DNA_de <- hg19rmsk_de[hg19rmsk_de$class_id == "DNA", ] #14
 
 ```
 
@@ -110,19 +113,31 @@ expressed LTR, non-LTR TEs.
 dfTElog2 <- as.matrix(log2(dfTE + 1))
 
 teComplexHeatmap(
-    dfTElog2,
+    dfTElog2[hg19_non_LTR_de$gene_id, ],
     teFilter = hg19_non_LTR_de$gene_id,
-    teAnnot = hg19_non_LTR_de,
     fileName = "figures/deTEsnonLTR.pdf"
 )
 ```
+
+
 ```{r}
 teComplexHeatmap(
     dfTElog2,
     teFilter = hg19_LTR_de$gene_id,
     top = 56,
-    teAnnot = hg19_LTR_de[,c(1,2)],
     fileName = "figures/deTEsLTR.pdf"
 )
+```
+
+```{r}
+teComplexHeatmap(
+    dfTElog2,
+    teFilter = hg19_DNA_de$gene_id,
+    fileName = "figures/deTEsDNA.pdf"
+)
+```
+
+```{r}
+
 ```
 

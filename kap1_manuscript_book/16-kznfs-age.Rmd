@@ -1,26 +1,99 @@
 # Age of KRAB-ZNFs
 
+Here we try to find out the age of KRAB-ZNFs in our data. We first import the information from GenTree and our data.
 ```{r}
 library(twice)
 library(plotly)
+library(viridis)
+library(hrbrthemes)
 ```
+We import GenTree data (hg19 ensembl version 37), and our human correlation data.
 ```{r}
-data(hg38age)
+data("hg19age")
 
 # hm expression
-dfhm <- read.csv("hm_results/hmCorrResult81.csv")
+dfhm <- read.csv("../hm_results/hmCorrResult81.csv")
 
 # extract 81 kznfs
 znfs <- unique(dfhm$geneName)
 
-hg38age_znfs <- hg38age[hg38age$geneName %in% znfs,]
+hg19age_znfs <- hg19age[hg19age$geneName %in% znfs,]
 
 ```
 
 ```{r}
-znfs_exclude <- dfhm[!('%in%'(dfhm$geneName, hg38age_znfs$geneName)),]
+znfs_exclude <- dfhm[!('%in%'(dfhm$geneName, hg19age_znfs$geneName)),]
+unique(znfs_exclude$geneName)
+
 # total 11 exlude KRAB-ZNFs not in GenTree data
 ```
+
+Then calculate the proportion on GenTree
+```{r}
+num <- c()
+for (i in 0:13){
+    n <- nrow(hg19age[hg19age$branch==i, ])
+    num <- c(num, n)
+}
+
+df <- data.frame(number = num)
+df$branch <- c(0:13)
+
+num_kznf <- c(2, 7, 8, 1, 6, 32, 15, 6, 3, 1)
+branch <- c(12, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+df2 <- data.frame(number=num_kznf, branch=branch)
+
+df <- rbind(df, df2)
+
+df$branch <- as.character(df$branch)
+ggplot(df, aes(x=branch, y=number)) +
+    geom_bar()
+
+df$group <- c(rep("all", 14), rep("KZNFs", 10))
+df$branch <- factor(
+    df$branch, 
+    levels = c("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13")
+)
+
+p1 <- ggplot(df, aes(x=branch, y=log(number+1), fill=group)) +
+    geom_bar(position="stack", stat="identity", alpha=0.7) +
+    coord_flip() +
+    scale_fill_manual(name = "", values = c("#34568B", "#f09e60")) +
+    theme_minimal() +
+    theme(axis.text = element_text(size=14)) +
+    labs(x = "", y = "log( Number of genes + 1 )")
+
+ggsave(p1, filename = "figures/kznfs_age.jpg", bg="white", dpi=400)
+```
+
+
+```{r}
+ggplot(df, aes(x=branch, y=log(number), fill=group)) +
+    geom_bar(position="fill", stat="identity", alpha=0.7) +
+    coord_flip() +
+    scale_fill_manual(values = c("#34568B", "#f09e60")) +
+    theme_minimal() +
+    theme(axis.text = element_text(size=14)) +
+    labs(x = "", y = "Percentage")
+```
+
+```{r}
+library(ggplot2)
+library(ggdendro)
+
+gentree <- data.frame(
+    Branch=c(as.character(0:13)),
+    Split=c(454.6, 361.2, 324.5, 220.2, 176.1, 104.7,
+            97.4, 91, 44.2, 29.6, 18.8, 15.1, 6.1, 0)
+)
+
+hc <- hclust(dist(gentree))
+ggdendrogram(hc)
+
+```
+
+
+
 
 #### is significant correlation of KZNFs are relatively young?
 ```{r}
@@ -38,4 +111,5 @@ hmchimp_znfs <- unique(hmchimp$geneName)
 hmchimp_znfs_exclude <- dfhm[!('%in%'(dfhm$geneName, hmchimp_znfs)),]
 unique(hmchimp_znfs_exclude$geneName)
 ```
+
 

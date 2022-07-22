@@ -1,9 +1,4 @@
----
-title: "010_TEKRABber_corr_vis"
-author: "yao"
-date: "4/20/2022"
-output: html_document
----
+# Correlation pairs
 
 ```{r}
 library(ggplot2)

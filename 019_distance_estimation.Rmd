@@ -1,9 +1,4 @@
----
-title: "019_distance_estimation"
-author: "yao"
-date: '2022-05-11'
-output: html_document
----
+# Distance estimattion
 
 In this analysis, we want to see if negative or positive correlation between KRAB-ZNFs and TEs are related to their distance on chromosome. We only can compare KRAB-ZNFs and TEs on the same chromosome.
 1. Extract positive/negative correlation pairs from human data

@@ -1,9 +1,5 @@
----
-title: "007_subset_coordinate"
-author: "yao"
-date: "3/2/2022"
-output: html_document
----
+# Subset of coordinates
+
 In this file, I will select the coordinates and send them to anna to do the analysis again.
 (1) Subset only the information from hg19 ensGene and rmsk file.
 (2) Subsets the name of gene and TEs from TEKRABber result

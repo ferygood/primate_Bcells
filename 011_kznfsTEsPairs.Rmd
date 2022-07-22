@@ -1,9 +1,4 @@
----
-title: "011_kznfsTEsPairs"
-author: "yao"
-date: "4/22/2022"
-output: html_document
----
+# KRAB-ZNFs-TEs pairs
 
 ```{r}
 library(twice)

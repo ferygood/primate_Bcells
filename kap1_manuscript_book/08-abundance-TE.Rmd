@@ -1,24 +1,229 @@
 # Abundance TEs
 
-Here we calculate the average abundance of transposable elements:
+For the first part of result in kap1 paper, we investigate the expression of TEs
+(1)
 
 ```{r}
 library(tidyverse)
+library(reshape2)
+library(ggplot2)
+library(ggpubr)
 ```
+
+
 import transposable elements data
+
 ```{r}
-hmTE <- read.csv("counts/hm_te.csv")
-chimpTE <- read.csv("counts/chimp_te.csv")
-oranTE <- read.csv("counts/oran_te.csv")
+hmTE <- read.csv("data/counts/hm_te.csv")
+chimpTE <- read.csv("data/counts/chimp_te.csv")
+oranTE <- read.csv("data/counts/oran_te.csv")
+```
+
+
+You can look up the information about class of Transposable elements from [UCSC RepeatMasker Track Settings](https://genome.ucsc.edu/cgi-bin/hgTrackUi?g=rmsk)  
+The analysis below we first exclude unsure classification, including family and 
+class name end with "?" (for example DNA?). We classified transposable elements referring to their mode of mobilization, such as 
+DNA transposons, and retrotransposons. Retrotransposon includes two groups: 
+(1) Non-LTR retrotransposons:
+LINEs (Long terminal repeat elements), SINEs (Short interspersed nuclear element, which include ALUs), SVAs 
+(2) LTR retrotransposon (Long terminal repeat elements, which include retroposons).
+
+
+```{r}
+# see the statistics of our data
+select_TE <- c("DNA", "LINE", "SINE", "SVA", "LTR")
+te_levels <- c("DNA", "LINE", "SINE", "SVA", "LTR")
+hmTE <- hmTE[hmTE$class %in% select_TE, ]
+
+# +1 for 0 expression
+hmTE[,c(4,5,6)] <- hmTE[,c(4,5,6)] + 1
+
+df_melt <- melt(hmTE, value.name="expression")
+
+group_by(df_melt, class) %>%
+    summarise(
+        count = n(),
+        mean = mean(expression, na.rm=TRUE),
+        sd = sd(expression, na.rm=TRUE)
+    )
+
 ```
 
 ```{r}
-sumHmTE <- sum(hmTE[,c(4,5,6)])
-sumChimpTE <- sum(chimpTE[,c(4,5,6)])
-sumOranTE <- sum(oranTE[,c(4,5,6)])
+df_box <- df_melt %>% mutate(expression = log(expression)) # normalised to log scale
 
-sumChimpTE/sumHmTE
-sumOranTE/sumHmTE
+df_box$class <- factor(df_box$class, levels=c(te_levels))
+    
+hm_te_class_boxplot <- ggboxplot(df_box, x="class", y="expression", fill="class",
+                                 palette=c("#f5b7b1", "#d7bde2", "#a9cce3", "#a3e4d7",
+                                           "#f9e79f"))+
+    coord_cartesian(ylim=c(0, 12)) +
+    ylab("log expression") +
+    xlab("") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))
+hm_te_class_boxplot
+```
+
+```{r}
+# create variable classificed by class name
+for (name in select_TE){
+    temp_df <- df_box[df_box$class==name, ]
+    assign(name, temp_df)
+}
+```
+
+
+```{r}
+# for quickly generate box plot variables 
+
+box_TE <- function(df, min=0, max=12){
+    family_list <- unique(df$family)
+    print(family_list)
+    for (name in family_list){
+        g <- ggboxplot(df[df$family==name, ], x="family", y="expression", color="name") +
+            theme_bw()
+        assign(paste0("g", name), g, envir = .GlobalEnv)
+    }
+}
+```
+
+
+```{r}
+# human SINE
+# human Alu
+box_TE(SINE)
+print(gAlu)
+ggsave(gAlu, filename = "figures/humanAluExp.jpg", width = 10, height = 5, dpi=400)
+
+SINE_human <- ggarrange(gDeu, gMIR, gSINE, nrow = 2, ncol =2)
+ggsave(SINE_human, filename = "figures/humanSINE_Exp.jpg", width = 10, height = 5, dpi=400, bg = "white")
+```
+
+```{r}
+# human LINE
+# human L1
+box_TE(LINE)
+ggsave(gL1, filename = "figures/humanL1Exp.jpg", width = 15, height = 5, dpi=400)
+LINE_human <- ggarrange(gRTE, gCR1, gL2, `gDong-R4`, `gRTE-BovB`, nrow = 3, ncol =2)
+ggsave(LINE_human, filename = "figures/humanLINE_Exp.jpg", width = 10, height = 5, dpi=400, bg = "white")
+```
+
+
+We are not sure about if we want to dig too deep to the rabbit hole. So we first visualize the distribution between each species. If we need more information, we can come back to this part. 
+
+```{r}
+# Chimpanzee
+chimpTE <- chimpTE[chimpTE$class %in% select_TE, ]
+
+# + 1 for 0 expression
+chimpTE[,c(4,5,6)] <- chimpTE[,c(4,5,6)] + 1
+
+df_chimp_melt <- melt(chimpTE, value.name="expression")
+
+df_chimp_box <- df_chimp_melt %>% mutate(expression = log(expression)) # normalised to log scale
+df_chimp_box$class <- factor(df_chimp_box$class, levels=c(te_levels))    
+
+chimp_te_class_boxplot <- ggboxplot(df_chimp_box, x="class", y="expression", fill="class",
+                                 palette=c("#f5b7b1", "#d7bde2", "#a9cce3", "#a3e4d7",
+                                           "#f9e79f"))+
+    coord_cartesian(ylim=c(0, 12)) +
+    ylab("log expression") +
+    xlab("") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))
+chimp_te_class_boxplot
+```
+```{r}
+# Orangutan
+oranTE <- oranTE[oranTE$class %in% select_TE, ]
+
+# +1 for 0 expression
+oranTE[,c(4,5,6)] <- oranTE[,c(4,5,6)] + 1
+
+df_oran_melt <- melt(oranTE, value.name="expression")
+
+df_oran_box <- df_oran_melt %>% mutate(expression = log(expression)) # normalised to log scale
+
+df_oran_box$class <- factor(df_oran_box$class, levels=c(te_levels))
+    
+oran_te_class_boxplot <- ggboxplot(df_oran_box, x="class", y="expression", fill="class",
+                                 palette=c("#f5b7b1", "#d7bde2", "#a9cce3", "#a3e4d7",
+                                           "#f9e79f"))+
+    coord_cartesian(ylim=c(0, 12)) +
+    ylab("log expression") +
+    xlab("") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))
+oran_te_class_boxplot
+```
+```{r}
+g1 <- ggarrange(hm_te_class_boxplot, chimp_te_class_boxplot, oran_te_class_boxplot, 
+          ncol = 3, nrow = 1, widths = 15, heights = 5, legend = FALSE)
+g1
+```
+```{r}
+ggsave(g1, file="figures/TEboxplot.jpg", width = 10, height = 3, dpi=400)
+```
+
+Then we try to visualize their percentage in each group to have a better visualization.
+```{r}
+# calculate percentage
+hm_te_per <- df_box %>% 
+    group_by(class) %>%
+    summarise(exp_per_group=sum(expression)) %>%
+    mutate(per = 100 * exp_per_group/sum(exp_per_group))
+
+chimp_te_per <- df_chimp_box %>% 
+    group_by(class) %>%
+    summarise(exp_per_group=sum(expression)) %>%
+    mutate(per = 100 * exp_per_group/sum(exp_per_group))
+
+oran_te_per <- df_oran_box %>% 
+    group_by(class) %>%
+    summarise(exp_per_group=sum(expression)) %>%
+    mutate(per = 100 * exp_per_group/sum(exp_per_group))
+```
+
+```{r}
+library(ggrepel)
+
+
+pie <- function(df){
+    
+    df_pos <- df %>%
+        mutate(csum = rev(cumsum(rev(exp_per_group))),
+               pos = exp_per_group/2 + lead(csum, 1),
+               pos = if_else(is.na(pos), exp_per_group/2, pos))
+    
+    
+    g <- ggplot(df, aes(x = "", y = exp_per_group, fill = class)) +
+        geom_col(width = 1, color = 1) +
+        coord_polar(theta = "y") +
+        scale_fill_manual(values = c("#f5b7b1", "#d7bde2", "#a9cce3", "#a3e4d7", "#f9e79f")) +
+        geom_label_repel(data = df_pos, 
+                         aes(y = pos, label=paste0(round(per,2), "%")),
+                         size = 4.5, nudge_x = 1, show.legend = FALSE) +
+        guides(fill = guide_legend(title="Class")) +
+        theme_void()
+    g
+}
+```
+
+
+```{r}
+hmTEpie <- pie(hm_te_per)
+chimpTEpie <- pie(chimp_te_per)
+oranTEpie <- pie(oran_te_per)
+
+g2 <- ggarrange(hmTEpie, chimpTEpie, oranTEpie, ncol=3, nrow=1, 
+                widths = 15, heights = 5, common.legend = TRUE, legend = "bottom")
+
+g2
+```
+
+```{r}
+ggsave(g2, file="figures/TEpiechart.jpg", width = 10, height = 3, dpi=400, bg="white")
 ```
 
 

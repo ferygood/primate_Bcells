@@ -1,9 +1,4 @@
----
-title: "TEKRABber-CoDiNA"
-author: "yao"
-date: "3/1/2022"
-output: html_document
----
+# TEKRABber CoDiNA
 
 ```{r load package}
 library(CoDiNA)
